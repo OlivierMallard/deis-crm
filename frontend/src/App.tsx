@@ -1,0 +1,57 @@
+import { useState } from 'react'
+
+const sections = ['Dashboard', 'Prospects', 'Clients', 'Tâches', 'Contrats'] as const
+type Section = (typeof sections)[number]
+
+export default function App() {
+  const [activeSection, setActiveSection] = useState<Section>('Dashboard')
+
+  return (
+    <div className="app-layout">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">D</span>
+          <span>CRM <strong>DEIS</strong></span>
+        </div>
+        <p className="sidebar-label">ESPACE COMMERCIAL</p>
+        <nav aria-label="Navigation principale">
+          {sections.map((section) => (
+            <button
+              key={section}
+              type="button"
+              className={`nav-item${activeSection === section ? ' active' : ''}`}
+              aria-current={activeSection === section ? 'page' : undefined}
+              onClick={() => setActiveSection(section)}
+            >
+              {section}
+            </button>
+          ))}
+        </nav>
+        <p className="sidebar-footer">Votre espace de suivi commercial</p>
+      </aside>
+
+      <main className="main-content">
+        <header className="page-header">
+          <p className="eyebrow">CRM DEIS / ESPACE COMMERCIAL</p>
+          <h1>{activeSection}</h1>
+          <p className="subtitle">
+            {activeSection === 'Dashboard'
+              ? 'Bienvenue dans votre espace de gestion commerciale.'
+              : `Votre espace ${activeSection.toLocaleLowerCase('fr-FR')}.`}
+          </p>
+        </header>
+        <section className="welcome-card" aria-labelledby="welcome-title">
+          <span className="card-label">{activeSection === 'Dashboard' ? 'VUE D’ENSEMBLE' : activeSection.toLocaleUpperCase('fr-FR')}</span>
+          <h2 id="welcome-title">
+            {activeSection === 'Dashboard' ? 'Votre CRM prend forme' : 'Un espace prêt à évoluer'}
+          </h2>
+          <p>
+            {activeSection === 'Dashboard'
+              ? 'Retrouvez les prospects, clients, tâches et contrats depuis le menu de navigation.'
+              : 'Les fonctionnalités de cette rubrique seront ajoutées lors des prochaines étapes.'}
+          </p>
+        </section>
+      </main>
+    </div>
+  )
+}
