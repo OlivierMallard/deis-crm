@@ -1,10 +1,57 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const sections = ['Dashboard', 'Prospects', 'Clients', 'Tâches', 'Contrats'] as const
 type Section = (typeof sections)[number]
+type ApiStatus = 'loading' | 'connected' | 'unavailable'
+
+const apiStatusLabels: Record<ApiStatus, string> = {
+  loading: 'Connexion...',
+  connected: 'API connectée',
+  unavailable: 'API indisponible',
+}
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('Dashboard')
+  const [apiStatus, setApiStatus] = useState<ApiStatus>('loading')
+
+  useEffect(() => {
+    if (activeSection !== 'Dashboard') return
+
+    const controller = new AbortController()
+    let active = true
+    const timeout = window.setTimeout(() => controller.abort(), 5000)
+
+    setApiStatus('loading')
+
+    async function checkApi() {
+      try {
+        const response = await fetch('/api/health', {
+          signal: controller.signal,
+          cache: 'no-store',
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+        const health: unknown = await response.json()
+        if (!health || typeof health !== 'object' || !('status' in health) || health.status !== 'ok') {
+          throw new Error('Réponse de santé API invalide')
+        }
+
+        if (active) setApiStatus('connected')
+      } catch {
+        if (active) setApiStatus('unavailable')
+      } finally {
+        window.clearTimeout(timeout)
+      }
+    }
+
+    void checkApi()
+
+    return () => {
+      active = false
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [activeSection])
 
   return (
     <div className="app-layout">
@@ -40,6 +87,11 @@ export default function App() {
               : `Votre espace ${activeSection.toLocaleLowerCase('fr-FR')}.`}
           </p>
         </header>
+        {activeSection === 'Dashboard' && (
+          <p className={`api-status api-status--${apiStatus}`} role="status">
+            {apiStatusLabels[apiStatus]}
+          </p>
+        )}
         <section className="welcome-card" aria-labelledby="welcome-title">
           <span className="card-label">{activeSection === 'Dashboard' ? 'VUE D’ENSEMBLE' : activeSection.toLocaleUpperCase('fr-FR')}</span>
           <h2 id="welcome-title">
