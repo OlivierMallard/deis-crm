@@ -1,3 +1,4 @@
+import { actionsRouter } from './routes/actions.js';
 import express, { type ErrorRequestHandler } from 'express';
 import { Prisma } from './generated/prisma/client.js';
 import { prospectsRouter } from './routes/prospects.js';
@@ -9,13 +10,16 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'CRM DEIS API' });
 });
 app.use('/api/prospects', prospectsRouter);
+app.use('/api/actions', actionsRouter);
 app.use('/api', (_req, res) => { res.status(404).json({ message: 'Route introuvable.' }); });
 
 const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
   if (error instanceof ValidationError) {
     res.status(400).json({ message: error.message });
   } else if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-    res.status(404).json({ message: 'Prospect introuvable.' });
+    res.status(404).json({ message: 'Ressource introuvable.' });
+  } else if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+    res.status(409).json({ message: 'Relation prospect/action invalide. Supprimez les actions liées avant de supprimer ce prospect.' });
   } else if (error && typeof error === 'object' && 'type' in error && error.type === 'entity.parse.failed') {
     res.status(400).json({ message: 'Le JSON envoyé est invalide.' });
   } else if (error && typeof error === 'object' && 'type' in error && error.type === 'entity.too.large') {

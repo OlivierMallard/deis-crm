@@ -1,3 +1,4 @@
+import Actions from './Actions'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { prospectsApi, statusLabels, type Prospect, type ProspectInput, type ProspectStatus } from '../api/prospects'
 
@@ -10,6 +11,7 @@ const fields = [
 ] as const
 
 export default function Prospects() {
+  const [actionProspect, setActionProspect] = useState<Prospect | null>(null)
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -136,6 +138,7 @@ export default function Prospects() {
                 <td>{prospect.email || '—'}</td><td>{prospect.phone || '—'}</td>
                 <td><span className={`status-badge status-${prospect.status.toLowerCase()}`}>{statusLabels[prospect.status]}</span></td>
                 <td><div className="row-actions">
+                  <button className="button" disabled={busy || formOpen} onClick={() => setActionProspect(prospect)}>Actions commerciales</button>
                   <button className="button" disabled={busy || formOpen} aria-label={`Modifier ${prospect.firstName} ${prospect.lastName}`} onClick={() => openForm(prospect)}>Modifier</button>
                   <button className="button button-danger" disabled={busy || formOpen} aria-label={`Supprimer ${prospect.firstName} ${prospect.lastName}`} onClick={() => void remove(prospect)}>Supprimer</button>
                 </div></td>
@@ -144,6 +147,7 @@ export default function Prospects() {
           </table>
         </div>
       )}
+      {actionProspect && <><button className="button" onClick={() => setActionProspect(null)}>Fermer les actions du prospect</button><Actions key={actionProspect.id} prospect={actionProspect} /></>}
     </section>
   )
 }

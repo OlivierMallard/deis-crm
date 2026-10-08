@@ -1,3 +1,5 @@
+import Actions from './components/Actions'
+import ActionMetrics from './components/ActionMetrics'
 import { useEffect, useState } from 'react'
 import Prospects from './components/Prospects'
 
@@ -93,7 +95,8 @@ export default function App() {
             {apiStatusLabels[apiStatus]}
           </p>
         )}
-        {activeSection === 'Prospects' ? <Prospects /> : <section className="welcome-card" aria-labelledby="welcome-title">
+        {activeSection === 'Dashboard' && <ActionMetrics />}
+        {activeSection === 'Prospects' ? <Prospects /> : activeSection === 'Tâches' ? <Actions /> : <section className="welcome-card" aria-labelledby="welcome-title">
           <span className="card-label">{activeSection === 'Dashboard' ? 'VUE D’ENSEMBLE' : activeSection.toLocaleUpperCase('fr-FR')}</span>
           <h2 id="welcome-title">
             {activeSection === 'Dashboard' ? 'Votre CRM prend forme' : 'Un espace prêt à évoluer'}

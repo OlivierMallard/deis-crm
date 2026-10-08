@@ -18,6 +18,7 @@ enum ProspectStatus {
 }
 
 model Prospect {
+  actions   Action[]
   id        Int            @id @default(autoincrement())
   firstName String
   lastName  String
@@ -28,4 +29,29 @@ model Prospect {
   notes     String?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+}
+
+
+enum ActionType {
+  CALL
+  EMAIL
+  MEETING
+  TASK
+  OTHER
+}
+
+model Action {
+  id          Int        @id @default(autoincrement())
+  prospectId  Int
+  prospect    Prospect   @relation(fields: [prospectId], references: [id], onDelete: Restrict)
+  type        ActionType
+  title       String
+  description String?
+  dueAt       DateTime   @db.Timestamptz(3)
+  completedAt DateTime?  @db.Timestamptz(3)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
+
+  @@index([prospectId])
+  @@index([dueAt])
 }
