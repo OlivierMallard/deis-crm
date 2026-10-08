@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Prospects from './components/Prospects'
 
 const sections = ['Dashboard', 'Prospects', 'Clients', 'Tâches', 'Contrats'] as const
 type Section = (typeof sections)[number]
@@ -92,7 +93,7 @@ export default function App() {
             {apiStatusLabels[apiStatus]}
           </p>
         )}
-        <section className="welcome-card" aria-labelledby="welcome-title">
+        {activeSection === 'Prospects' ? <Prospects /> : <section className="welcome-card" aria-labelledby="welcome-title">
           <span className="card-label">{activeSection === 'Dashboard' ? 'VUE D’ENSEMBLE' : activeSection.toLocaleUpperCase('fr-FR')}</span>
           <h2 id="welcome-title">
             {activeSection === 'Dashboard' ? 'Votre CRM prend forme' : 'Un espace prêt à évoluer'}
@@ -102,7 +103,7 @@ export default function App() {
               ? 'Retrouvez les prospects, clients, tâches et contrats depuis le menu de navigation.'
               : 'Les fonctionnalités de cette rubrique seront ajoutées lors des prochaines étapes.'}
           </p>
-        </section>
+        </section>}
       </main>
     </div>
   )

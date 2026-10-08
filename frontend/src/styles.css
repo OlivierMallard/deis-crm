@@ -34,7 +34,46 @@ h1 { margin: 0; font-size: 36px; letter-spacing: -.035em; }
 h2 { margin: 16px 0 12px; font-size: 23px; letter-spacing: -.02em; }
 .welcome-card p { margin: 0; max-width: 580px; color: #64748b; line-height: 1.8; }
 
+.prospects-card { margin-top: 36px; padding: 28px; border: 1px solid #e3e8ef; border-radius: 14px; background: #fff; }
+.prospects-toolbar, .form-actions, .row-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.prospects-toolbar { justify-content: space-between; margin-bottom: 24px; }
+.prospects-toolbar h2 { margin: 0; }
+.button { border: 1px solid #d5dee8; border-radius: 8px; padding: 9px 13px; background: #fff; color: #142437; cursor: pointer; }
+.button:hover { background: #f4f6f9; }
+.button-primary { background: #294b50; border-color: #294b50; color: #fff; }
+.button-primary:hover { background: #1b393e; }
+.button-danger { color: #b42318; }
+.button:disabled { opacity: .55; cursor: not-allowed; }
+.button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #267765; outline-offset: 3px; }
+.notice { padding: 12px 16px; border-radius: 8px; line-height: 1.6; }
+.notice-success { color: #206453; background: #e8f7f0; }
+.notice-error { color: #b42318; background: #fff0ed; }
+.prospect-form { padding: 24px; margin-bottom: 24px; border: 1px solid #e3e8ef; border-radius: 10px; background: #f8fafc; }
+.prospect-form h3 { margin: 0 0 20px; }
+.prospect-form fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.form-grid label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
+.form-grid input, .form-grid select, .form-grid textarea { width: 100%; min-width: 0; border: 1px solid #ccd6e2; border-radius: 7px; padding: 11px; font: inherit; font-weight: 400; color: #142437; background: #fff; }
+.form-grid textarea { resize: vertical; }
+.form-notes { grid-column: 1 / -1; }
+.form-hint, .empty-list { color: #64748b; }
+.form-hint { font-size: 12px; }
+.table-scroll { overflow-x: auto; }
+.prospects-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+.prospects-table th { color: #64748b; font-weight: 600; background: #f8fafc; }
+.prospects-table th, .prospects-table td { padding: 14px 12px; border-bottom: 1px solid #e3e8ef; }
+.prospects-table td { overflow-wrap: anywhere; max-width: 260px; }
+.row-actions { flex-wrap: nowrap; }
+.status-badge { display: inline-block; white-space: nowrap; padding: 5px 10px; border-radius: 20px; background: #eef2f6; color: #475569; font-size: 12px; }
+.status-contacted { background: #eaf1ff; color: #305aa0; }
+.status-qualified { background: #fff6de; color: #876413; }
+.status-won { background: #e8f7f0; color: #206453; }
+.status-lost { background: #fff0ed; color: #b42318; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
 @media (max-width: 700px) {
+  .prospects-card, .prospect-form { padding: 18px; }
+  .form-grid { grid-template-columns: 1fr; }
   .app-layout { flex-direction: column; }
   .sidebar { width: 100%; padding: 24px 16px; }
   .sidebar-label { margin-top: 24px; }
