@@ -1,4 +1,5 @@
 import { clientsRouter, contractsRouter, commercialMetrics } from './routes/commerce.js';
+import { quotesRouter, invoicesRouter, paymentsRouter, financeMetrics, FinanceError } from './routes/finance.js';
 import { actionsRouter } from './routes/actions.js';
 import express, { type ErrorRequestHandler } from 'express';
 import { Prisma } from './generated/prisma/client.js';
@@ -7,6 +8,10 @@ import { ValidationError } from './validation/prospects.js';
 
 export const app = express();
 app.use(express.json());
+app.use('/api/quotes', quotesRouter);
+app.use('/api/invoices', invoicesRouter);
+app.use('/api/payments', paymentsRouter);
+app.get('/api/dashboard/finance', financeMetrics);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'CRM DEIS API' });
 });
@@ -18,7 +23,9 @@ app.get('/api/dashboard/commercial', commercialMetrics);
 app.use('/api', (_req, res) => { res.status(404).json({ message: 'Route introuvable.' }); });
 
 const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
-  if (error instanceof ValidationError) {
+  if (error instanceof FinanceError) {
+    res.status(error.code).json({ message: error.message });
+  } else if (error instanceof ValidationError) {
     res.status(400).json({ message: error.message });
   } else if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
     res.status(404).json({ message: 'Ressource introuvable.' });

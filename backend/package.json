@@ -8,7 +8,7 @@
     "build": "prisma generate && tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate"
   },

@@ -1,3 +1,5 @@
+import Finance from './components/Finance'
+import FinanceMetrics from './components/FinanceMetrics'
 import Clients from './components/Clients'
 import Contracts from './components/Contracts'
 import CommercialMetrics from './components/CommercialMetrics'
@@ -6,7 +8,7 @@ import ActionMetrics from './components/ActionMetrics'
 import { useEffect, useState } from 'react'
 import Prospects from './components/Prospects'
 
-const sections = ['Dashboard', 'Prospects', 'Clients', 'Tâches', 'Contrats'] as const
+const sections = ['Dashboard', 'Prospects', 'Clients', 'Tâches', 'Contrats', 'Devis', 'Factures'] as const
 type Section = (typeof sections)[number]
 type ApiStatus = 'loading' | 'connected' | 'unavailable'
 
@@ -99,8 +101,8 @@ export default function App() {
             {apiStatusLabels[apiStatus]}
           </p>
         )}
-        {activeSection === 'Dashboard' && <><ActionMetrics /><CommercialMetrics /></>}
-        {activeSection === 'Prospects' ? <Prospects onClient={id => { setClientId(id); setActiveSection('Clients') }} /> : activeSection === 'Tâches' ? <Actions /> : activeSection === 'Clients' ? <Clients initialId={clientId} /> : activeSection === 'Contrats' ? <Contracts /> : <section className="welcome-card" aria-labelledby="welcome-title">
+        {activeSection === 'Dashboard' && <><ActionMetrics /><CommercialMetrics /><FinanceMetrics /></>}
+        {activeSection === 'Prospects' ? <Prospects onClient={id => { setClientId(id); setActiveSection('Clients') }} /> : activeSection === 'Tâches' ? <Actions /> : activeSection === 'Clients' ? <Clients initialId={clientId} /> : activeSection === 'Contrats' ? <Contracts /> : activeSection === 'Devis' ? <Finance kind='quotes' /> : activeSection === 'Factures' ? <Finance kind='invoices' /> : <section className="welcome-card" aria-labelledby="welcome-title">
           <span className="card-label">VUE D’ENSEMBLE</span>
           <h2 id="welcome-title">
             {activeSection === 'Dashboard' ? 'Votre CRM prend forme' : 'Un espace prêt à évoluer'}

@@ -68,6 +68,8 @@ enum ContractStatus {
 }
 
 model Client {
+  quotes Quote[]
+  invoices Invoice[]
   id Int @id @default(autoincrement())
   firstName String
   lastName String
@@ -83,6 +85,8 @@ model Client {
 }
 
 model Contract {
+  quotes Quote[]
+  invoices Invoice[]
   id Int @id @default(autoincrement())
   clientId Int
   client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
@@ -99,4 +103,98 @@ model Contract {
   updatedAt DateTime @updatedAt
   @@index([clientId])
   @@index([status])
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+enum PaymentMethod {
+  BANK_TRANSFER
+  CARD
+  CASH
+  CHECK
+  OTHER
+}
+model Quote {
+  id Int @id @default(autoincrement())
+  clientId Int
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  contractId Int?
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  reference String @unique
+  title String
+  description String?
+  status QuoteStatus @default(DRAFT)
+  issueDate DateTime @db.Date
+  validUntil DateTime? @db.Date
+  vatExemptionMention String?
+  totalExclTaxCents Int
+  vatCents Int
+  totalInclTaxCents Int
+  lines QuoteLine[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([clientId])
+  @@index([contractId])
+  @@index([status])
+}
+model QuoteLine {
+  id Int @id @default(autoincrement())
+  quoteId Int
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  quantity Decimal @db.Decimal(12, 4)
+  unitPriceCents Int
+  vatRateBasisPoints Int @default(0)
+  position Int
+  totalExclTaxCents Int
+  vatCents Int
+  totalInclTaxCents Int
+  @@unique([quoteId, position])
+}
+model Invoice {
+  id Int @id @default(autoincrement())
+  clientId Int
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  contractId Int?
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  reference String @unique
+  title String
+  issueDate DateTime @db.Date
+  dueDate DateTime @db.Date
+  totalExclTaxCents Int
+  vatRateBasisPoints Int @default(0)
+  vatCents Int
+  totalInclTaxCents Int
+  vatExemptionMention String?
+  status InvoiceStatus @default(DRAFT)
+  payments Payment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([clientId])
+  @@index([contractId])
+  @@index([status, dueDate])
+}
+model Payment {
+  id Int @id @default(autoincrement())
+  invoiceId Int
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  amountCents Int
+  paidAt DateTime @db.Date
+  method PaymentMethod
+  reference String?
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([invoiceId])
+  @@index([paidAt])
 }

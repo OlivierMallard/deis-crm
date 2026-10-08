@@ -94,3 +94,5 @@ h2 { margin: 16px 0 12px; font-size: 23px; letter-spacing: -.02em; }
 .metric strong { color: #267765; font-size: 32px; }
 .metric span { color: #64748b; }
 .prospect-form .form-actions { margin-top: 18px; }
+
+.finance-line { padding: 1rem 0; border-bottom: 1px solid #e8edf3; }
