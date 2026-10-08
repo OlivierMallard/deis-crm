@@ -12,7 +12,7 @@ export const actionsApi = {
   list: (filters: { prospectId?: number; completed?: boolean; period?: Period } = {}) => {
     const query = new URLSearchParams({ timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
     Object.entries(filters).forEach(([k,v]) => { if (v !== undefined) query.set(k,String(v)) })
-    return request<Action[]>(`?${query}`, { cache: 'no-store' })
+    return request<{items:Action[];total:number}>(`?${query}`, { cache: 'no-store' })
   },
   save: (input: ActionInput, id?: number) => request<Action>(id ? `/${id}` : '', { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }),
   delete: (id: number) => request<void>(`/${id}`, { method: 'DELETE' }),

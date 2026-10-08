@@ -40,11 +40,11 @@ async function exercise(database) {
     assert.equal((await request(`/actions/${id}`)).status,200);
     const updated=await request(`/actions/${id}`,'PUT',{ ...input, prospectId, title: 'Updated', dueAt: dates[1] }); assert.equal(updated.status,200); assert.equal((await updated.json()).title,'Updated');
     for (const period of ['overdue','today','upcoming']) {
-      const r=await request(`/actions?prospectId=${prospectId}&completed=false&period=${period}&timeZone=Europe%2FParis`); assert.equal(r.status,200); assert.equal((await r.json()).length,1);
+      const r=await request(`/actions?prospectId=${prospectId}&completed=false&period=${period}&timeZone=Europe%2FParis`); assert.equal(r.status,200); assert.equal((await r.json()).items.length,1);
     }
     const completed=await request(`/actions/${id}/complete`,'PATCH'); assert.equal(completed.status,200); const finished=(await completed.json()).completedAt; assert.ok(finished);
     assert.equal((await (await request(`/actions/${id}/complete`,'PATCH')).json()).completedAt,finished);
-    assert.equal((await (await request(`/actions?prospectId=${prospectId}&completed=true`)).json()).length,1);
+    assert.equal((await (await request(`/actions?prospectId=${prospectId}&completed=true`)).json()).items.length,1);
     assert.equal((await (await request(`/actions/${id}/reopen`,'PATCH')).json()).completedAt,null);
     assert.equal((await request(`/prospects/${prospectId}`,'DELETE')).status,409);
     if (database) { await prisma.$disconnect(); assert.equal((await (await request(`/actions/${id}`)).json()).title,'Updated'); }
@@ -71,6 +71,8 @@ test('CRUD HTTP avec doubles Prisma (sans modification PostgreSQL)', async () =>
   patch(prisma.action,'create',async ({data})=>{ const row={...data,id:sequence++,completedAt:null,prospect:person}; records.set(row.id,row); return row; });
   patch(prisma.action,'findUnique',async ({where})=>records.get(where.id)??null);
   patch(prisma.action,'findMany',async ({where})=>[...records.values()].filter(r=>(!where.prospectId || r.prospectId===where.prospectId) && (where.completedAt===undefined || (where.completedAt===null ? r.completedAt===null : r.completedAt!==null)) && (!where.dueAt || ((!where.dueAt.lt || r.dueAt<where.dueAt.lt) && (!where.dueAt.gte || r.dueAt>=where.dueAt.gte)))));
+  patch(prisma.action,'count',async args=>(await prisma.action.findMany(args)).length);
+  patch(prisma,'$transaction',async fn=>fn(prisma));
   patch(prisma.action,'update',async ({where,data})=>{ const row=records.get(where.id); if(!row) missing(); Object.assign(row,data); return row; });
   patch(prisma.action,'updateMany',async ({where,data})=>{ const row=records.get(where.id); if(row && row.completedAt===null) Object.assign(row,data); return {count:row?1:0}; });
   patch(prisma.action,'delete',async ({where})=>{ if(!records.has(where.id)) missing(); records.delete(where.id); });

@@ -1,10 +1,7 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
-import { parseActionId, parseActionInput, parseActionFilters } from '../validation/actions.js';
+import { parseActionId, parseActionInput } from '../validation/actions.js';
 const include = { prospect: { select: { id: true, firstName: true, lastName: true, company: true } } };
-export async function listActions(req: Request, res: Response) {
-  res.json(await prisma.action.findMany({ where: parseActionFilters(req.query), include, orderBy: [{ dueAt: 'asc' }, { id: 'asc' }] }));
-}
 export async function getAction(req: Request, res: Response) {
   const action = await prisma.action.findUnique({ where: { id: parseActionId(req.params.id) }, include });
   if (!action) { res.status(404).json({ message: 'Action introuvable.' }); return; }

@@ -57,7 +57,9 @@ test('API REST et persistance PostgreSQL', { skip: process.env.TEST_DATABASE !==
     assert.equal((await detail.json()).notes, input.notes);
     const listResponse = await request('/prospects');
     assert.equal(listResponse.status, 200);
-    const list = await listResponse.json();
+    const page = await listResponse.json();
+    assert.equal(page.page,1); assert.equal(page.pageSize,25);
+    const list = page.items;
     assert.ok(list.some((prospect) => prospect.id === createdId));
     for (let index = 1; index < list.length; index++) {
       assert.ok(Date.parse(list[index - 1].createdAt) >= Date.parse(list[index].createdAt));

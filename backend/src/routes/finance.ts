@@ -4,7 +4,8 @@ import { prisma } from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { parseId } from '../validation/commerce.js';
 import { ValidationError } from '../validation/prospects.js';
-import { quoteInput, invoiceInput, paymentInput, settlement, object, status, quoteStatuses, invoiceStatuses } from '../validation/finance.js';
+import { integer } from '../validation/lists.js';
+import { quoteInput, invoiceInput, paymentInput, settlement, object } from '../validation/finance.js';
 export class FinanceError extends Error { constructor(public code: number, message: string) { super(message); } }
 type Tx = Prisma.TransactionClient;
 export const quotesRouter = Router(), invoicesRouter = Router(), paymentsRouter = Router();
@@ -22,13 +23,6 @@ async function lock(tx: Tx, table: 'Quote' | 'Invoice', id: number) {
   const rows = table === 'Quote' ? await tx.$queryRaw`SELECT id FROM "Quote" WHERE id = ${id} FOR UPDATE` : await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${id} FOR UPDATE`;
   if (!(rows as unknown[]).length) throw new FinanceError(404,'Document introuvable.');
 }
-function filters(query: Record<string, unknown>, quote: boolean) {
-  const v = object(query,['clientId','contractId','status','search']);
-  const search = v.search;
-  if (search !== undefined && (typeof search !== 'string' || search.length > 200)) throw new ValidationError('Recherche invalide.');
-  return { ...(v.clientId !== undefined ? { clientId: parseId(v.clientId) } : {}), ...(v.contractId !== undefined ? { contractId: parseId(v.contractId) } : {}), ...(v.status !== undefined ? { status: status(v.status,quote ? quoteStatuses : invoiceStatuses) } : {}), ...(search ? { OR: [{reference: {contains: search as string, mode: 'insensitive' as const}},{title:{contains:search as string,mode:'insensitive' as const}}] } : {}) };
-}
-quotesRouter.get('/', async (req,res) => res.json(await prisma.quote.findMany({ where: filters(req.query,true) as Prisma.QuoteWhereInput, include: quoteInclude, orderBy: { id: 'desc' } })));
 quotesRouter.get('/:id', async (req,res) => {
   const row = await prisma.quote.findUnique({ where: { id: parseId(req.params.id) }, include: quoteInclude });
   if (!row) throw new FinanceError(404,'Devis introuvable.'); res.json(row);
@@ -51,7 +45,6 @@ quotesRouter.delete('/:id', async (req,res) => {
   await prisma.$transaction(async tx => { await lock(tx,'Quote',id); const row = await tx.quote.findUniqueOrThrow({ where: { id } }); if (row.status === 'ACCEPTED') throw new FinanceError(409,'Devis acceptÃ© verrouillÃ©.'); await tx.quote.delete({ where: { id } }); });
   res.status(204).end();
 });
-invoicesRouter.get('/', async (req,res) => res.json((await prisma.invoice.findMany({ where: filters(req.query,false) as Prisma.InvoiceWhereInput, include: invoiceInclude, orderBy: { id: 'desc' } })).map(invoiceView)));
 invoicesRouter.get('/:id', async (req,res) => {
   const row = await prisma.invoice.findUnique({ where: { id: parseId(req.params.id) }, include: invoiceInclude });
   if (!row) throw new FinanceError(404,'Facture introuvable.'); res.json(invoiceView(row));
@@ -79,8 +72,11 @@ invoicesRouter.delete('/:id', async (req,res) => {
   await prisma.$transaction(async tx => { await lock(tx,'Invoice',id); const row = await tx.invoice.findUniqueOrThrow({ where: { id }, include: { payments: true } }); if (row.status !== 'DRAFT' || row.payments.length) throw new FinanceError(409,'Seule une facture brouillon sans paiement peut Ãªtre supprimÃ©e.'); await tx.invoice.delete({ where: { id } }); }); res.status(204).end();
 });
 paymentsRouter.get('/', async (req,res) => {
-  const v = object(req.query,['invoiceId','clientId']);
-  res.json(await prisma.payment.findMany({ where: { ...(v.invoiceId !== undefined ? { invoiceId: parseId(v.invoiceId) } : {}), ...(v.clientId !== undefined ? { invoice: { clientId: parseId(v.clientId) } } : {}) }, include: { invoice: true }, orderBy: [{ paidAt: 'desc' },{ id: 'desc' }] }));
+  const v = object(req.query,['invoiceId','clientId','page','pageSize']);
+  const page=v.page===undefined?1:integer(v.page,'page',1,1000000),pageSize=v.pageSize===undefined?25:integer(v.pageSize,'pageSize',1,100);
+  const where={ ...(v.invoiceId !== undefined ? { invoiceId: parseId(v.invoiceId) } : {}), ...(v.clientId !== undefined ? { invoice: { clientId: parseId(v.clientId) } } : {}) };
+  const result=await prisma.$transaction(async tx=>{const total=await tx.payment.count({where});const items=await tx.payment.findMany({where,include:{invoice:true},orderBy:[{paidAt:'desc'},{id:'desc'}],skip:(page-1)*pageSize,take:pageSize});return {items,total,page,pageSize,totalPages:Math.ceil(total/pageSize)}},{isolationLevel:'RepeatableRead'});
+  res.json(result);
 });
 for (const method of ['post','put'] as const) paymentsRouter[method](method === 'post' ? '/' : '/:id', async (req,res) => {
   const id = method === 'put' ? parseId((req.params as { id: string }).id) : undefined, data = paymentInput(req.body);

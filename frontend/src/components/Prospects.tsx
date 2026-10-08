@@ -1,4 +1,5 @@
 import Actions from './Actions'
+import { useListTools } from './ListTools'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { prospectsApi, statusLabels, type Prospect, type ProspectInput, type ProspectStatus } from '../api/prospects'
 
@@ -10,7 +11,8 @@ const fields = [
   ['email', 'Email', 'email'], ['phone', 'Téléphone', 'tel'],
 ] as const
 
-export default function Prospects({ onClient }: { onClient: (id: number) => void }) {
+export default function Prospects({ onClient, initialId }: { onClient: (id: number) => void; initialId?:number }) {
+  const list = useListTools('prospects')
   const [actionProspect, setActionProspect] = useState<Prospect | null>(null)
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,8 +31,8 @@ export default function Prospects({ onClient }: { onClient: (id: number) => void
     setLoading(true)
     setError('')
     try {
-      const data = await prospectsApi.list()
-      if (current === generation.current) setProspects(data)
+      const data = await list.load<Prospect>()
+      if (current === generation.current) setProspects(list.accept(data))
     } catch (cause) {
       if (current === generation.current) setError(cause instanceof Error ? cause.message : 'Erreur API.')
     } finally {
@@ -41,7 +43,8 @@ export default function Prospects({ onClient }: { onClient: (id: number) => void
   useEffect(() => {
     void refresh()
   return () => { generation.current++ }
-  }, [])
+  }, [list.queryString])
+  useEffect(()=>{if(initialId){let active=true;fetch(`/api/prospects/${initialId}`).then(async r=>{if(!r.ok)throw new Error('Prospect introuvable.');return r.json()}).then(p=>{if(active)openForm(p)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}}},[initialId])
 
   useEffect(() => { if (formOpen) firstNameRef.current?.focus() }, [formOpen, editing])
 
@@ -100,6 +103,7 @@ export default function Prospects({ onClient }: { onClient: (id: number) => void
         <h2 id="prospects-title">Suivi des prospects</h2>
         <button className="button button-primary" disabled={busy || formOpen} onClick={() => openForm()}>Nouveau prospect</button>
       </div>
+      {list.controls}
       {success && <p className="notice notice-success" role="status">{success}</p>}
       {error && <div className="notice notice-error" role="alert">{error} <button className="button" disabled={loading || busy} onClick={() => void refresh()}>Réessayer</button></div>}
       {formOpen && (
@@ -156,6 +160,7 @@ export default function Prospects({ onClient }: { onClient: (id: number) => void
           </table>
         </div>
       )}
+      {list.pagination(loading || busy)}
       {actionProspect && <><button className="button" onClick={() => setActionProspect(null)}>Fermer les actions du prospect</button><Actions key={actionProspect.id} prospect={actionProspect} /></>}
     </section>
   )

@@ -2,10 +2,6 @@ import type { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { parseProspectId, parseProspectInput } from '../validation/prospects.js';
 
-export async function listProspects(_req: Request, res: Response) {
-  res.json(await prisma.prospect.findMany({ include: { convertedClient: { select: { id: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }));
-}
-
 export async function getProspect(req: Request, res: Response) {
   const prospect = await prisma.prospect.findUnique({ where: { id: parseProspectId(req.params.id) }, include: { convertedClient: { select: { id: true } } } });
   if (!prospect) { res.status(404).json({ message: 'Prospect introuvable.' }); return; }

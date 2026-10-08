@@ -1,3 +1,5 @@
+import Reporting from './components/Reporting'
+import GlobalSearch from './components/GlobalSearch'
 import Finance from './components/Finance'
 import FinanceMetrics from './components/FinanceMetrics'
 import Clients from './components/Clients'
@@ -8,7 +10,7 @@ import ActionMetrics from './components/ActionMetrics'
 import { useEffect, useState } from 'react'
 import Prospects from './components/Prospects'
 
-const sections = ['Dashboard', 'Prospects', 'Clients', 'Tâches', 'Contrats', 'Devis', 'Factures'] as const
+const sections = ['Dashboard', 'Prospects', 'Clients', 'Tâches', 'Contrats', 'Devis', 'Factures', 'Reporting'] as const
 type Section = (typeof sections)[number]
 type ApiStatus = 'loading' | 'connected' | 'unavailable'
 
@@ -20,6 +22,7 @@ const apiStatusLabels: Record<ApiStatus, string> = {
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('Dashboard')
+  const [selected, setSelected] = useState<{kind:string;id:number}|null>(null)
   const [clientId, setClientId] = useState<number | undefined>()
   const [apiStatus, setApiStatus] = useState<ApiStatus>('loading')
 
@@ -77,7 +80,7 @@ export default function App() {
               type="button"
               className={`nav-item${activeSection === section ? ' active' : ''}`}
               aria-current={activeSection === section ? 'page' : undefined}
-              onClick={() => { setClientId(undefined); setActiveSection(section) }}
+              onClick={() => { setSelected(null); setClientId(undefined); setActiveSection(section) }}
             >
               {section}
             </button>
@@ -87,6 +90,7 @@ export default function App() {
       </aside>
 
       <main className="main-content">
+        <GlobalSearch onSelect={(kind,id)=>{setSelected({kind,id});setClientId(kind==='clients'?id:undefined);setActiveSection(({prospects:'Prospects',clients:'Clients',contracts:'Contrats',quotes:'Devis',invoices:'Factures'} as Record<string,Section>)[kind])}}/>
         <header className="page-header">
           <p className="eyebrow">CRM DEIS / ESPACE COMMERCIAL</p>
           <h1>{activeSection}</h1>
@@ -102,7 +106,7 @@ export default function App() {
           </p>
         )}
         {activeSection === 'Dashboard' && <><ActionMetrics /><CommercialMetrics /><FinanceMetrics /></>}
-        {activeSection === 'Prospects' ? <Prospects onClient={id => { setClientId(id); setActiveSection('Clients') }} /> : activeSection === 'Tâches' ? <Actions /> : activeSection === 'Clients' ? <Clients initialId={clientId} /> : activeSection === 'Contrats' ? <Contracts /> : activeSection === 'Devis' ? <Finance kind='quotes' /> : activeSection === 'Factures' ? <Finance kind='invoices' /> : <section className="welcome-card" aria-labelledby="welcome-title">
+        {activeSection === 'Prospects' ? <Prospects key={selected?.id} initialId={selected?.kind==='prospects'?selected.id:undefined} onClient={id => { setClientId(id); setActiveSection('Clients') }} /> : activeSection === 'Tâches' ? <Actions /> : activeSection === 'Clients' ? <Clients initialId={clientId} /> : activeSection === 'Contrats' ? <Contracts key={selected?.id} initialId={selected?.kind==='contracts'?selected.id:undefined} /> : activeSection === 'Devis' ? <Finance key={'q'+selected?.id} kind='quotes' initialId={selected?.kind==='quotes'?selected.id:undefined} /> : activeSection === 'Factures' ? <Finance key={'i'+selected?.id} kind='invoices' initialId={selected?.kind==='invoices'?selected.id:undefined} /> : activeSection === 'Reporting' ? <Reporting /> : <section className="welcome-card" aria-labelledby="welcome-title">
           <span className="card-label">VUE D’ENSEMBLE</span>
           <h2 id="welcome-title">
             {activeSection === 'Dashboard' ? 'Votre CRM prend forme' : 'Un espace prêt à évoluer'}

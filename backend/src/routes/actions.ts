@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { listActions, getAction, saveAction, deleteAction, completeAction, reopenAction } from '../controllers/actions.js';
+import { getAction, saveAction, deleteAction, completeAction, reopenAction } from '../controllers/actions.js';
 export const actionsRouter = Router();
-actionsRouter.get('/', listActions);
 actionsRouter.get('/:id', getAction);
 actionsRouter.post('/', saveAction);
 actionsRouter.put('/:id', saveAction);

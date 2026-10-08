@@ -35,7 +35,7 @@ async function exerciseFinance() {
   const server=app.listen(0,'127.0.0.1'); await once(server,'listening');
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const request=(p,m='GET',b)=>fetch(base+p,{method:m,headers:{'Content-Type':'application/json'},body:b===undefined?undefined:JSON.stringify(b)});
-  const call=async(p,m,b,expected=200)=> {const r=await request(p,m,b);assert.equal(r.status,expected,await r.clone().text());return expected===204?null:r.json();};
+  const call=async(p,m,b,expected=200)=> {const r=await request(p,m,b);assert.equal(r.status,expected,await r.clone().text());if(expected===204)return null;const payload=await r.json();return payload.items??payload;};
   const beforeData=JSON.stringify(await Promise.all([prisma.prospect.findMany({orderBy:{id:'asc'}}),prisma.action.findMany({orderBy:{id:'asc'}}),prisma.client.findMany({orderBy:{id:'asc'}}),prisma.contract.findMany({orderBy:{id:'asc'}})]));
   let client; const quotes=[],invoices=[];
   try {
@@ -98,6 +98,7 @@ test('finance HTTP CRUD, immutable documents, payment corrections and metrics wi
     const d=prisma[name];
     patch(d,'findUnique',async({where})=>decorate(name,table.get(where.id)));
     patch(d,'findUniqueOrThrow',async({where})=>{if(!table.has(where.id))fail('P2025');return decorate(name,table.get(where.id));});
+    patch(d,'count',async({where}={})=>[...table.values()].filter(r=>match(r,where)).length);
     patch(d,'findMany',async({where}={})=>[...table.values()].filter(r=>match(r,where)).map(r=>decorate(name,r)));
     patch(d,'create',async({data})=>{
       if(data.reference && [...table.values()].some(r=>r.reference===data.reference))fail('P2002');

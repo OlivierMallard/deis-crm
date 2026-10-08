@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { convertProspect, createProspect, deleteProspect, getProspect, listProspects, updateProspect } from '../controllers/prospects.js';
+import { convertProspect, createProspect, deleteProspect, getProspect, updateProspect } from '../controllers/prospects.js';
 
 export const prospectsRouter = Router();
-prospectsRouter.get('/', listProspects);
 prospectsRouter.get('/:id', getProspect);
 prospectsRouter.post('/', createProspect);
 prospectsRouter.post('/:id/convert', convertProspect);

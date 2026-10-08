@@ -9,7 +9,7 @@ export default function ActionMetrics() {
     async function load() {
       try {
         const rows = await Promise.all((['today', 'overdue', 'upcoming'] as const).map(period => actionsApi.list({ completed: false, period })))
-        if (active) { setCounts(rows.map(r => r.length)); setError('') }
+        if (active) { setCounts(rows.map(r => r.total)); setError('') }
       } catch (e) { if (active) setError(e instanceof Error ? e.message : 'Erreur API.') }
     }
     void load()

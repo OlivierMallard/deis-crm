@@ -19,7 +19,7 @@ async function exercise(database) {
   const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}/api`;
   const request = (path, method = 'GET', body) => fetch(base + path, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
-  const data = async (path, method, body, expected = 200) => { const r = await request(path, method, body); assert.equal(r.status, expected, await r.clone().text()); return expected === 204 ? null : r.json(); };
+  const data = async (path, method, body, expected = 200) => { const r = await request(path, method, body); assert.equal(r.status, expected, await r.clone().text()); if(expected===204)return null; const payload=await r.json(); return payload.items ?? payload; };
   const prospectIds = [], clientIds = [], contractIds = [], actionIds = [];
   try {
     const before = await data('/dashboard/commercial');

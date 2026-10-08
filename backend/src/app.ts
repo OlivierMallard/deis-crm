@@ -1,4 +1,6 @@
 import { clientsRouter, contractsRouter, commercialMetrics } from './routes/commerce.js';
+import { discoveryRouter } from './routes/discovery.js';
+import { reportsRouter } from './routes/reports.js';
 import { quotesRouter, invoicesRouter, paymentsRouter, financeMetrics, FinanceError } from './routes/finance.js';
 import { actionsRouter } from './routes/actions.js';
 import express, { type ErrorRequestHandler } from 'express';
@@ -8,6 +10,8 @@ import { ValidationError } from './validation/prospects.js';
 
 export const app = express();
 app.use(express.json());
+app.use('/api', discoveryRouter);
+app.use('/api/reports', reportsRouter);
 app.use('/api/quotes', quotesRouter);
 app.use('/api/invoices', invoicesRouter);
 app.use('/api/payments', paymentsRouter);

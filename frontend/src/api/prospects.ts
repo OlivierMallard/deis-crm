@@ -30,7 +30,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const prospectsApi = {
   convert: (id: number) => request<{ id: number }>(`/${id}/convert`, { method: 'POST' }),
-  list: () => request<Prospect[]>('', { cache: 'no-store' }),
+  list: async (q = '') => (await request<{items:Prospect[]}>(`?pageSize=100&q=${encodeURIComponent(q)}`, { cache: 'no-store' })).items,
   save: (input: ProspectInput, id?: number) => request<Prospect>(id === undefined ? '' : `/${id}`, {
     method: id === undefined ? 'POST' : 'PUT',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),

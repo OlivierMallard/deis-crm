@@ -1,21 +1,22 @@
 import Finance from './Finance'
+import { useListTools, referenceItems, ReferenceSelect } from './ListTools'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { commerceRequest as api, contractLabels, eurosToCents, money, type Client, type Contract, type ContractInput } from '../api/commerce'
-export default function Contracts({ clientId, onChange }: { clientId?: number; onChange?: () => void }) {
+export default function Contracts({ clientId, onChange, initialId }: { clientId?: number; onChange?: () => void; initialId?:number }) {
+  const list = useListTools('contracts', {clientId:String(clientId ?? '')})
   const [rows, setRows] = useState<Contract[]>([]), [clients, setClients] = useState<Client[]>([])
-  const [filterClient, setFilterClient] = useState(String(clientId ?? '')), [filterStatus, setFilterStatus] = useState('')
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(''), [success, setSuccess] = useState('')
   const [input, setInput] = useState<ContractInput | null>(null), [editing, setEditing] = useState<number | undefined>(), [amount, setAmount] = useState('0.00')
   const [invoiceContract,setInvoiceContract] = useState<Contract | null>(null)
   const generation = useRef(0)
   async function refresh() {
     const n = ++generation.current; setLoading(true)
-    try { const query = new URLSearchParams(); if (filterClient) query.set('clientId', filterClient); if (filterStatus) query.set('status', filterStatus)
-      const [r,c] = await Promise.all([api<Contract[]>(`contracts?${query}`), api<Client[]>('clients')]); if(n === generation.current) { setRows(r); setClients(c) }
+    try { const [r,c] = await Promise.all([list.load<Contract>(), referenceItems<Client>('clients')]); if(n === generation.current) { setRows(list.accept(r)); setClients(c) }
     } catch(e) { if(n === generation.current) setError(e instanceof Error ? e.message : 'Erreur API.') }
     finally { if(n === generation.current) setLoading(false) }
   }
-  useEffect(() => { setError(''); void refresh(); return () => { generation.current++ } }, [filterClient, filterStatus])
+  useEffect(() => { setError(''); void refresh(); return () => { generation.current++ } }, [list.queryString])
+  useEffect(()=>{if(initialId){let active=true;api<Contract>(`contracts/${initialId}`).then(row=>{if(active)open(row)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}}},[initialId])
   function open(row?: Contract) {
     setEditing(row?.id); setError(''); setSuccess(''); setAmount(row ? `${Math.floor(row.amountCents/100)}.${String(row.amountCents%100).padStart(2,'0')}` : '0.00')
     setInput(row ? { clientId: row.clientId, reference: row.reference, title: row.title, description: row.description, amountCents: row.amountCents, status: row.status, startDate: row.startDate?.slice(0,10) ?? '', endDate: row.endDate?.slice(0,10) ?? '' } : { clientId: clientId ?? clients[0]?.id ?? 0, reference: '', title: '', description: '', amountCents: 0, status: 'DRAFT', startDate: '', endDate: '' })
@@ -29,9 +30,9 @@ export default function Contracts({ clientId, onChange }: { clientId?: number; o
   }
   return <section className="prospects-card"><div className="prospects-toolbar"><h2>Contrats</h2><button className="button button-primary" disabled={busy || loading || !!input || !clients.length} onClick={() => open()}>Nouveau contrat</button></div>
     {success && <p className="notice notice-success" role="status">{success}</p>}{error && <p className="notice notice-error" role="alert">{error} <button className="button" disabled={busy || loading} onClick={() => void refresh()}>Réessayer</button></p>}
-    <div className="form-grid">{!clientId && <label>Client<select value={filterClient} onChange={e => setFilterClient(e.target.value)}><option value="">Tous</option>{clients.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}</select></label>}<label>Statut<select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="">Tous</option>{Object.entries(contractLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label></div>
+    {list.controls}{list.pagination(loading || busy)}
     {input && <form className="prospect-form" onSubmit={save}><h3>{editing ? 'Modifier le contrat' : 'Nouveau contrat'}</h3><fieldset disabled={busy}><div className="form-grid">
-      <label>Client *<select required value={input.clientId || ''} onChange={e => setInput({ ...input, clientId: Number(e.target.value) })}><option value="" disabled>Choisir</option>{clients.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}</select></label>
+      <ReferenceSelect kind="clients" label="Client *" required value={input.clientId} onChange={id=>setInput({...input,clientId:id})}/>
       <label>Référence (automatique si vide)<input maxLength={100} value={input.reference ?? ''} onChange={e => setInput({ ...input, reference: e.target.value })}/></label>
       <label>Titre *<input autoFocus required value={input.title} onChange={e => setInput({ ...input, title: e.target.value })}/></label>
       <label>Montant HT en euros *<input required inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)}/></label>

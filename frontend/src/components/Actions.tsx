@@ -1,3 +1,4 @@
+import { useListTools, ReferenceSelect } from './ListTools'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { actionsApi, actionTypes, type Action, type ActionInput, type Period } from '../api/actions'
 import { prospectsApi, type Prospect } from '../api/prospects'
@@ -11,6 +12,7 @@ function localInput(date: string) {
 }
 export default function Actions({ prospect }: { prospect?: Prospect }) {
   const uid = useId()
+  const list = useListTools('actions',{prospectId:String(prospect?.id ?? '')})
   const [lists, setLists] = useState<Action[][]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,10 +28,10 @@ export default function Actions({ prospect }: { prospect?: Prospect }) {
     setLoading(true); setError('')
     try {
       const [data, people] = await Promise.all([
-        Promise.all(groups.map(g => actionsApi.list({ prospectId: prospect?.id, completed: g.key === 'completed', ...(g.key !== 'completed' ? { period: g.key } : {}) }))),
+        list.load<Action>(),
         prospect ? Promise.resolve([prospect]) : prospectsApi.list(),
       ])
-      if (n === generation.current) { setLists(data); setProspects(people) }
+      if (n === generation.current) { const rows=list.accept(data); const midnight=new Date();midnight.setHours(0,0,0,0);const tomorrow=new Date(midnight);tomorrow.setDate(tomorrow.getDate()+1);setLists(groups.map(g=>rows.filter(a=>g.key==='completed'?!!a.completedAt:!a.completedAt&&(g.key==='overdue'?new Date(a.dueAt)<midnight:g.key==='today'?new Date(a.dueAt)>=midnight&&new Date(a.dueAt)<tomorrow:new Date(a.dueAt)>=tomorrow)))); setProspects(people) }
     } catch (e) { if (n === generation.current) setError(e instanceof Error ? e.message : 'Erreur API.') }
     finally { if (n === generation.current) setLoading(false) }
   }
@@ -37,7 +39,7 @@ export default function Actions({ prospect }: { prospect?: Prospect }) {
     void refresh()
     const timer = window.setInterval(() => void refresh(), 60000)
     return () => { generation.current++; window.clearInterval(timer) }
-  }, [prospect?.id])
+  }, [prospect?.id,list.queryString])
   function openForm(action?: Action) {
     setEditing(action ?? null); setError(''); setSuccess('')
     setInput(action ? { prospectId: action.prospectId, type: action.type, title: action.title, description: action.description, dueAt: localInput(action.dueAt) } : { prospectId: prospect?.id ?? prospects[0]?.id ?? 0, type: 'CALL', title: '', description: '', dueAt: '' })
@@ -60,10 +62,12 @@ export default function Actions({ prospect }: { prospect?: Prospect }) {
     <div className="prospects-toolbar"><h2 id={`${uid}-title`}>{prospect ? `Actions de ${prospect.firstName} ${prospect.lastName}` : 'Actions commerciales et relances'}</h2>
       <button className="button button-primary" disabled={busy || loading || open || !prospects.length} onClick={() => openForm()}>Ajouter une action{prospect ? ' pour ce prospect' : ''}</button></div>
     <p className="form-hint">Dates affichées dans votre fuseau : {Intl.DateTimeFormat().resolvedOptions().timeZone}. Le retard commence le lendemain de la date prévue.</p>
+    {list.controls}{list.pagination(loading || busy)}
+    <p className="form-hint">Les groupes ci-dessous contiennent les actions de la page courante.</p>
     {success && <p className="notice notice-success" role="status">{success}</p>}
     {error && <div className="notice notice-error" role="alert">{error} <button className="button" disabled={busy || loading} onClick={() => void refresh()}>Réessayer</button></div>}
     {open && <form className="prospect-form" onSubmit={save}><h3>{editing ? 'Modifier l’action' : 'Nouvelle action'}</h3><fieldset disabled={busy}><div className="form-grid">
-      {!prospect && <label>Prospect *<select required value={input.prospectId || ''} onChange={e => setInput({ ...input, prospectId: Number(e.target.value) })}><option value="" disabled>Choisir un prospect</option>{prospects.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}{p.company ? ` — ${p.company}` : ''}</option>)}</select></label>}
+      {!prospect && <ReferenceSelect kind="prospects" label="Prospect *" required value={input.prospectId} onChange={id=>setInput({...input,prospectId:id})}/>}
       <label>Type *<select value={input.type} onChange={e => setInput({ ...input, type: e.target.value as ActionInput['type'] })}>{Object.entries(actionTypes).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
       <label>Titre *<input autoFocus required maxLength={500} value={input.title} onChange={e => setInput({ ...input, title: e.target.value })}/></label>
       <label>Date et heure prévues *<input type="datetime-local" required value={input.dueAt} onChange={e => setInput({ ...input, dueAt: e.target.value })}/></label>

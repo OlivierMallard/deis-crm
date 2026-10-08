@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
-import { parseId, parseClientInput, parseContractInput, parseContractFilters } from '../validation/commerce.js';
+import { parseId, parseClientInput, parseContractInput } from '../validation/commerce.js';
 export const clientsRouter = Router();
 export const contractsRouter = Router();
 const clientInclude = { _count: { select: { contracts: true } } };
 const contractInclude = { client: { select: { id: true, firstName: true, lastName: true, company: true } } };
-clientsRouter.get('/', async (_req, res) => { res.json(await prisma.client.findMany({ include: clientInclude, orderBy: { id: 'desc' } })); });
 clientsRouter.get('/:id', async (req, res) => {
   const row = await prisma.client.findUnique({ where: { id: parseId(req.params.id) }, include: { ...clientInclude, sourceProspect: true, contracts: { orderBy: { id: 'desc' } } } });
   if (!row) { res.status(404).json({ message: 'Client introuvable.' }); return; } res.json(row);
@@ -20,7 +19,6 @@ clientsRouter.delete('/:id', async (req, res) => {
   if (row.sourceProspectId || row._count.contracts) { res.status(409).json({ message: 'Suppression refusée : ce client possède un historique ou des contrats.' }); return; }
   await prisma.client.delete({ where: { id } }); res.status(204).end();
 });
-contractsRouter.get('/', async (req, res) => { res.json(await prisma.contract.findMany({ where: parseContractFilters(req.query), include: contractInclude, orderBy: { id: 'desc' } })); });
 contractsRouter.get('/:id', async (req, res) => {
   const row = await prisma.contract.findUnique({ where: { id: parseId(req.params.id) }, include: contractInclude });
   if (!row) { res.status(404).json({ message: 'Contrat introuvable.' }); return; } res.json(row);
