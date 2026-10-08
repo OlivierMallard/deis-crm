@@ -1,3 +1,6 @@
+import Clients from './components/Clients'
+import Contracts from './components/Contracts'
+import CommercialMetrics from './components/CommercialMetrics'
 import Actions from './components/Actions'
 import ActionMetrics from './components/ActionMetrics'
 import { useEffect, useState } from 'react'
@@ -15,6 +18,7 @@ const apiStatusLabels: Record<ApiStatus, string> = {
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('Dashboard')
+  const [clientId, setClientId] = useState<number | undefined>()
   const [apiStatus, setApiStatus] = useState<ApiStatus>('loading')
 
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function App() {
               type="button"
               className={`nav-item${activeSection === section ? ' active' : ''}`}
               aria-current={activeSection === section ? 'page' : undefined}
-              onClick={() => setActiveSection(section)}
+              onClick={() => { setClientId(undefined); setActiveSection(section) }}
             >
               {section}
             </button>
@@ -95,9 +99,9 @@ export default function App() {
             {apiStatusLabels[apiStatus]}
           </p>
         )}
-        {activeSection === 'Dashboard' && <ActionMetrics />}
-        {activeSection === 'Prospects' ? <Prospects /> : activeSection === 'Tâches' ? <Actions /> : <section className="welcome-card" aria-labelledby="welcome-title">
-          <span className="card-label">{activeSection === 'Dashboard' ? 'VUE D’ENSEMBLE' : activeSection.toLocaleUpperCase('fr-FR')}</span>
+        {activeSection === 'Dashboard' && <><ActionMetrics /><CommercialMetrics /></>}
+        {activeSection === 'Prospects' ? <Prospects onClient={id => { setClientId(id); setActiveSection('Clients') }} /> : activeSection === 'Tâches' ? <Actions /> : activeSection === 'Clients' ? <Clients initialId={clientId} /> : activeSection === 'Contrats' ? <Contracts /> : <section className="welcome-card" aria-labelledby="welcome-title">
+          <span className="card-label">VUE D’ENSEMBLE</span>
           <h2 id="welcome-title">
             {activeSection === 'Dashboard' ? 'Votre CRM prend forme' : 'Un espace prêt à évoluer'}
           </h2>

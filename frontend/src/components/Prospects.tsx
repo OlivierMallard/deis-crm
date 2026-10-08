@@ -10,7 +10,7 @@ const fields = [
   ['email', 'Email', 'email'], ['phone', 'Téléphone', 'tel'],
 ] as const
 
-export default function Prospects() {
+export default function Prospects({ onClient }: { onClient: (id: number) => void }) {
   const [actionProspect, setActionProspect] = useState<Prospect | null>(null)
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,7 +40,7 @@ export default function Prospects() {
 
   useEffect(() => {
     void refresh()
-    return () => { generation.current++ }
+  return () => { generation.current++ }
   }, [])
 
   useEffect(() => { if (formOpen) firstNameRef.current?.focus() }, [formOpen, editing])
@@ -84,6 +84,14 @@ export default function Prospects() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Suppression impossible.')
     } finally { setBusy(false) }
+  }
+
+    async function convert(prospect: Prospect) {
+    if (busy || !window.confirm(`Convertir ${prospect.firstName} ${prospect.lastName} en client ? Le prospect et son historique seront conservés.`)) return
+    setBusy(true); setError(''); setSuccess('')
+    try { await prospectsApi.convert(prospect.id); setSuccess('Prospect converti en client.'); await refresh() }
+    catch(e) { setError(e instanceof Error ? e.message : 'Conversion impossible.') }
+    finally { setBusy(false) }
   }
 
   return (
@@ -138,6 +146,7 @@ export default function Prospects() {
                 <td>{prospect.email || '—'}</td><td>{prospect.phone || '—'}</td>
                 <td><span className={`status-badge status-${prospect.status.toLowerCase()}`}>{statusLabels[prospect.status]}</span></td>
                 <td><div className="row-actions">
+                  {prospect.convertedClient ? <button className="button" onClick={() => onClient(prospect.convertedClient!.id)}>Client créé ? Voir la fiche</button> : <button className="button" disabled={busy || formOpen} onClick={() => void convert(prospect)}>Convertir en client</button>}
                   <button className="button" disabled={busy || formOpen} onClick={() => setActionProspect(prospect)}>Actions commerciales</button>
                   <button className="button" disabled={busy || formOpen} aria-label={`Modifier ${prospect.firstName} ${prospect.lastName}`} onClick={() => openForm(prospect)}>Modifier</button>
                   <button className="button button-danger" disabled={busy || formOpen} aria-label={`Supprimer ${prospect.firstName} ${prospect.lastName}`} onClick={() => void remove(prospect)}>Supprimer</button>

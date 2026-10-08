@@ -11,7 +11,7 @@ export type ProspectInput = {
   status: ProspectStatus
   notes: string | null
 }
-export type Prospect = ProspectInput & { id: number; createdAt: string; updatedAt: string }
+export type Prospect = ProspectInput & { convertedClient?: { id: number } | null; id: number; createdAt: string; updatedAt: string }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response
@@ -29,6 +29,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const prospectsApi = {
+  convert: (id: number) => request<{ id: number }>(`/${id}/convert`, { method: 'POST' }),
   list: () => request<Prospect[]>('', { cache: 'no-store' }),
   save: (input: ProspectInput, id?: number) => request<Prospect>(id === undefined ? '' : `/${id}`, {
     method: id === undefined ? 'POST' : 'PUT',

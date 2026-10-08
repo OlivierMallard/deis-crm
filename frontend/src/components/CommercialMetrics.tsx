@@ -1,0 +1,8 @@
+import { useEffect, useState } from 'react'
+import { commerceRequest, money } from '../api/commerce'
+type Metrics = { totalClients: number; activeContracts: number; signedAmountCents: number; proposedAmountCents: number }
+export default function CommercialMetrics() {
+  const [data, setData] = useState<Metrics | null>(null), [error, setError] = useState(''), [revision, setRevision] = useState(0)
+  useEffect(() => { let active = true; async function load() { try { const d = await commerceRequest<Metrics>('dashboard/commercial'); if(active) { setData(d); setError('') } } catch(e) { if(active) setError(e instanceof Error ? e.message : 'Erreur API.') } } void load(); const timer = window.setInterval(() => void load(), 60000); return () => { active = false; window.clearInterval(timer) } }, [revision])
+  return <section className="prospects-card" aria-label="Indicateurs commerciaux"><p className="form-hint">Montants contractuels HT, pas du chiffre d’affaires encaissé. Les contrats annulés sont exclus.</p>{error ? <p className="notice notice-error" role="alert">{error} <button className="button" onClick={() => setRevision(v => v+1)}>Réessayer</button></p> : data ? <div className="metrics-grid">{[['Clients',data.totalClients],['Contrats signés ou en cours',data.activeContracts],['Montant signé, en cours ou terminé',money(data.signedAmountCents)],['Montant proposé',money(data.proposedAmountCents)]].map(([label,value]) => <div className="metric" key={label}><strong>{value}</strong><span>{label}</span></div>)}</div> : <p role="status">Chargement des indicateurs commerciaux…</p>}</section>
+}

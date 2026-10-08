@@ -18,6 +18,7 @@ enum ProspectStatus {
 }
 
 model Prospect {
+  convertedClient Client?
   actions   Action[]
   id        Int            @id @default(autoincrement())
   firstName String
@@ -54,4 +55,48 @@ model Action {
 
   @@index([prospectId])
   @@index([dueAt])
+}
+
+
+enum ContractStatus {
+  DRAFT
+  PROPOSED
+  SIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Client {
+  id Int @id @default(autoincrement())
+  firstName String
+  lastName String
+  company String?
+  email String?
+  phone String?
+  notes String?
+  sourceProspectId Int? @unique
+  sourceProspect Prospect? @relation(fields: [sourceProspectId], references: [id], onDelete: Restrict)
+  contracts Contract[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Contract {
+  id Int @id @default(autoincrement())
+  clientId Int
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  reference String @unique
+  title String
+  description String?
+  amountCents Int
+  currency String @default("EUR")
+  status ContractStatus @default(DRAFT)
+  startDate DateTime?
+  endDate DateTime?
+  signedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([clientId])
+  @@index([status])
 }
