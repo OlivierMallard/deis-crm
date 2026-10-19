@@ -1,3 +1,5 @@
+import { paymentExportRouter } from './routes/payment-export.js';
+import { authRouter, adminRouter, session, authenticated, admin, audit } from './routes/auth.js';
 import { clientsRouter, contractsRouter, commercialMetrics } from './routes/commerce.js';
 import { discoveryRouter } from './routes/discovery.js';
 import { reportsRouter } from './routes/reports.js';
@@ -9,7 +11,21 @@ import { prospectsRouter } from './routes/prospects.js';
 import { ValidationError } from './validation/prospects.js';
 
 export const app = express();
+app.disable('x-powered-by');
+app.use((_req,res,next)=>{res.setHeader('X-Content-Type-Options','nosniff');next();});
 app.use(express.json());
+app.use('/api', session);
+app.use('/api/auth', authRouter);
+app.use('/api', (req,res,next)=>{if(req.path==='/health')return next();return authenticated(req,res,next);});
+app.use('/api/admin', adminRouter);
+app.use('/api', (req,res,next)=>{if(req.method==='DELETE')return admin(req,res,next);next();});
+app.use('/api', async(req,res,next)=>{
+  if(req.method==='DELETE') {
+    await audit(res.locals.auth.user.id,'DELETE_REQUEST',req.path);
+  }
+  next();
+});
+app.use('/api', paymentExportRouter);
 app.use('/api', discoveryRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/quotes', quotesRouter);
@@ -27,6 +43,7 @@ app.get('/api/dashboard/commercial', commercialMetrics);
 app.use('/api', (_req, res) => { res.status(404).json({ message: 'Route introuvable.' }); });
 
 const errorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
+  if(res.headersSent){_next(error);return;}
   if (error instanceof FinanceError) {
     res.status(error.code).json({ message: error.message });
   } else if (error instanceof ValidationError) {

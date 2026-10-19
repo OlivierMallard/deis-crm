@@ -11,7 +11,7 @@ export type ProspectInput = {
   status: ProspectStatus
   notes: string | null
 }
-export type Prospect = ProspectInput & { convertedClient?: { id: number } | null; id: number; createdAt: string; updatedAt: string }
+export type Prospect = ProspectInput & { convertedClient?: { id: number } | null; archivedAt?:string|null; id: number; createdAt: string; updatedAt: string }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response

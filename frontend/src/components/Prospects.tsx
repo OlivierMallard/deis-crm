@@ -1,3 +1,5 @@
+import { AdminOnly } from './Auth'
+import ArchiveButton from './ArchiveButton'
 import Actions from './Actions'
 import { useListTools } from './ListTools'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
@@ -153,7 +155,7 @@ export default function Prospects({ onClient, initialId }: { onClient: (id: numb
                   {prospect.convertedClient ? <button className="button" onClick={() => onClient(prospect.convertedClient!.id)}>Client créé ? Voir la fiche</button> : <button className="button" disabled={busy || formOpen} onClick={() => void convert(prospect)}>Convertir en client</button>}
                   <button className="button" disabled={busy || formOpen} onClick={() => setActionProspect(prospect)}>Actions commerciales</button>
                   <button className="button" disabled={busy || formOpen} aria-label={`Modifier ${prospect.firstName} ${prospect.lastName}`} onClick={() => openForm(prospect)}>Modifier</button>
-                  <button className="button button-danger" disabled={busy || formOpen} aria-label={`Supprimer ${prospect.firstName} ${prospect.lastName}`} onClick={() => void remove(prospect)}>Supprimer</button>
+                  <ArchiveButton kind="prospects" row={prospect} onDone={()=>void refresh()}/><AdminOnly><button className="button button-danger" disabled={busy || formOpen} aria-label={`Supprimer ${prospect.firstName} ${prospect.lastName}`} onClick={() => void remove(prospect)}>Supprimer</button></AdminOnly>
                 </div></td>
               </tr>
             ))}</tbody>

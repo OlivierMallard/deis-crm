@@ -342,3 +342,142 @@ npm.cmd run build
   groupe portent sur la page courante. Les compteurs globaux du dashboard restent exacts.
 - Modifier un statut, rouvrir une action ou corriger un paiement peut modifier un
   reporting passé : le modèle actuel représente les données courantes, sans journal immuable.
+
+# Mission 10 — Authentification, rôles et exports
+
+## Architecture et changements
+
+Branche `feature/auth-roles-exports`. Analyse des modèles Prisma, routes métier,
+validateurs, composants, README et rapport Mission 9 avant modification.
+Les routes métier et le design existants sont conservés. La migration
+`20261019000000_auth_roles` ajoute `User`, `Session`, `AuditLog`, l’enum `UserRole`
+et deux colonnes nullables `archivedAt`. Aucun DROP, reset, suppression de données,
+commit ou push. Aucun compte avec identifiants par défaut.
+
+- `backend/src/routes/auth.ts` : login/logout/session, Argon2id, cookie HttpOnly,
+  CSRF, limite de tentatives, comptes et journal administrateur. Sessions de huit
+  heures, jeton aléatoire de 256 bits haché SHA-256 en base. Le rôle et l’activation
+  sont relus à chaque requête. Révocation lors de toute modification d’accès.
+- Le verrou transactionnel PostgreSQL `pg_advisory_xact_lock(101910)` sérialise
+  la protection du dernier administrateur actif et le bootstrap CLI.
+  La connexion reverrouille et revérifie le compte avant de créer sa session afin
+  de respecter une réinitialisation concurrente de son mot de passe.
+- `backend/src/app.ts` : protection de toutes les routes API sauf health/login,
+  contrôle ADMIN sur toutes les suppressions, journal des demandes et réussites.
+- `backend/scripts/create-admin.ts` : bootstrap interactif avec mot de passe masqué.
+- `backend/src/routes/discovery.ts` et `validation/lists.ts` : archivage/restauration,
+  filtre Archives, CSV/XLSX, colonnes supplémentaires et agrégations SQL groupées.
+  Les agrégations et les données sont lues dans la même transaction RepeatableRead.
+- `backend/src/lib/exports.ts` : écrivain XLSX partagé en streaming, lignes libérées
+  après écriture, types numériques/date, chaînes utilisateur jamais exécutées.
+- `backend/src/routes/payment-export.ts` : règlements associés aux factures filtrées,
+  filtres de dates de paiement inclusives `paidFrom` et `paidTo` en supplément.
+- `backend/src/lib/dev-purge.ts` : garde d’environnement pour la purge de fiction.
+  L’endpoint ADMIN exige deux marqueurs explicites sur la facture et une confirmation
+  exacte ; seuls les paiements de cette facture sont retirés dans la transaction.
+  Aucune purge n’a été effectuée ; les tests vérifient uniquement les refus.
+- `frontend/src/components/Auth.tsx` : écran de connexion, contrôle initial de session,
+  retour à la connexion après 401, déconnexion et gestion administrative des comptes.
+  Envoi du CSRF centralisé pour les appels API, sans stockage persistant de jeton.
+- `ArchiveButton.tsx`, `ListTools.tsx`, `App.tsx`, `main.tsx` et composants métier :
+  administration visible pour ADMIN, boutons sensibles masqués pour USER,
+  archivage/restauration, choix du périmètre et des formats d’export, états de
+  chargement et erreurs, période de paiement. Retrait de ligne d’un devis conservé
+  pour les utilisateurs standards.
+- `.env.example` et README : configuration, sauvegarde, migration, premier compte,
+  rôles, exports, Docker et commandes de validation.
+
+## Règles financières et champs disponibles
+
+Le total facturé clients additionne exclusivement les factures `ISSUED` HT.
+Le réglé et le solde sont TTC et portent sur les mêmes factures. Les exports de
+factures donnent séparément HT, TVA, TTC, montant payé, solde et statut.
+Le solde dû exporté est nul pour les brouillons et les factures annulées ; leurs
+montants de document restent visibles pour la traçabilité.
+Les factures annulées et brouillons restent identifiables et ne gonflent pas les
+totaux clients. Les devis finalisés ne sont plus supprimables : seul DRAFT l’est.
+Les règles existantes de facturation, TVA, paiements et annulation sont conservées.
+
+Les champs source prospect, adresse client et lien direct facture-devis n’existent
+pas dans le modèle initial ; aucune valeur ni relation n’est inventée.
+La dernière action est la dernière créée ; la prochaine relance est la plus petite
+échéance d’une action non terminée (y compris une action en retard).
+
+## Sauvegarde et conservation
+
+Sauvegarde PostgreSQL avant migration : `backend/data/before-mission10.dump`
+(format custom pg_dump, dossier ignoré par Git, contient les données du CRM).
+Migration appliquée avec `prisma migrate deploy`.
+Contrôle `node scripts/mission10-audit.mjs baseline` avant et `verify` après :
+les huit tables métier ont les mêmes contenus SHA-256 et nombres de lignes.
+Les nouvelles colonnes nullables d’archivage sont exclues de cette comparaison.
+
+| Table | Lignes conservées |
+| --- | ---: |
+| Prospect | 1 |
+| Action | 0 |
+| Client | 3 |
+| Contract | 1 |
+| Quote | 1 |
+| QuoteLine | 1 |
+| Invoice | 3 |
+| Payment | 1 |
+
+## Tests ajoutés et limites
+
+`auth.test.mjs` vérifie Argon2id, mots de passe, accès sans session, login valide et
+invalide, cookies, CSRF/origine, session expirée, compte désactivé, droits USER/ADMIN,
+dernier administrateur, refus de purge production, CSV et XLSX typés et sans formules.
+`exports.test.mjs` valide sur PostgreSQL les totaux, paiements partiels,
+annulations/brouillons, filtres, toutes les pages, archives/restauration et lecture
+sans modification des documents. Les anciens tests métier utilisent une fixture
+explicite de session administrateur dans `tests/legacy-auth.mjs` ; aucune exemption
+d’authentification n’est présente dans le code de production.
+
+Limites explicites : exports bornés à 10 000 lignes, avec erreur au-delà et sans
+troncature ; les lignes source restent bornées en mémoire tandis que le XLSX est
+écrit en streaming. Pour de plus gros volumes, prévoir une tâche asynchrone et un
+stockage temporaire. Aucun module d’avoirs, d’email de réinitialisation ou MFA ajouté.
+Le mot de passe initial/réinitialisé doit être transmis par un canal sécurisé.
+Le journal affiche les 100 derniers événements ; l’API accepte `page` pour remonter
+plus loin. Le limiteur de connexion est local au processus. Prévoir une tâche de
+nettoyage des sessions expirées et une politique de rétention du journal selon le
+déploiement. Chaque trace DELETE_SUCCESS est écrite dans la même transaction que
+la suppression : une erreur du journal annule la suppression.
+Les interactions visuelles dans un navigateur restent à valider manuellement.
+
+## Résultats finaux — 19 octobre 2026
+
+| Commande / contrôle | Résultat |
+| --- | --- |
+| `npx.cmd prisma migrate deploy` | Migration additive appliquée, aucune réinitialisation |
+| `npx.cmd prisma validate` | Schéma valide |
+| Backend `npm.cmd run build` | Génération Prisma 7.10.0 et compilation TypeScript réussies |
+| Backend `npm.cmd run typecheck` | Réussi |
+| Backend `$env:TEST_DATABASE='1'; npm.cmd test` | **27 tests réussis, 0 échec, 0 ignoré** |
+| Frontend `npm.cmd run build` | TypeScript et Vite réussis, 45 modules |
+| `node scripts/mission10-audit.mjs verify` après migration et après tests | Empreintes SHA-256 et nombres de lignes des huit tables métier identiques au baseline |
+| Verrou administratif exécuté réellement avec Prisma/PostgreSQL | Réussi ; résultat du verrou casté en texte pour compatibilité avec l’adaptateur |
+| `git diff --check` | Réussi |
+
+Les tests réels couvrent également la projection de session sans `passwordHash`,
+le stockage d’un haché distinct du jeton de cookie, la révocation après changement
+de mot de passe et la consultation administrative du journal. Les tests d’export
+vérifient le solde nul des factures annulées/brouillons, la période des paiements,
+les montants typés du XLSX et la conservation des documents après téléchargement.
+Les données temporaires des tests ont été nettoyées ; aucun compte applicatif par
+défaut n’a été créé. Le premier administrateur reste à créer avec la commande
+interactive `npm.cmd run admin:create` depuis `backend`.
+
+### Récapitulatif des fichiers
+
+| Groupe | Fichiers ajoutés ou adaptés |
+| --- | --- |
+| Schéma et configuration | `backend/prisma/schema.prisma`, migration `20261019000000_auth_roles/migration.sql`, `backend/.env.example`, `backend/package.json`, `backend/package-lock.json` |
+| Authentification et sécurité | `backend/src/routes/auth.ts`, `backend/src/app.ts`, `backend/src/lib/dev-purge.ts`, `backend/scripts/create-admin.ts` |
+| Données et exports | `backend/src/routes/discovery.ts`, `payment-export.ts`, `commerce.ts`, `finance.ts`, `backend/src/validation/lists.ts`, `backend/src/lib/exports.ts`, contrôleurs `actions.ts` et `prospects.ts` |
+| Interface | `frontend/src/components/Auth.tsx`, `ArchiveButton.tsx`, `ListTools.tsx`, `Prospects.tsx`, `Clients.tsx`, `Actions.tsx`, `Contracts.tsx`, `Finance.tsx`, `frontend/src/App.tsx`, `main.tsx`, types API `commerce.ts` et `prospects.ts` |
+| Vérification | `backend/tests/auth.test.mjs`, `exports.test.mjs`, `legacy-auth.mjs`, adaptation des six suites précédentes, `backend/scripts/mission10-audit.mjs` |
+| Documentation | `readme.md`, `REPORTING.md` |
+
+Aucune purge, aucun reset, aucun commit et aucun push exécutés.

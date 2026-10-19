@@ -1,3 +1,6 @@
+import { sendXlsx } from '../lib/exports.js';
+import { audit, admin } from './auth.js';
+import { parseId } from '../validation/commerce.js';
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -9,7 +12,7 @@ import { dayBounds } from '../validation/actions.js';
 export const discoveryRouter = Router();
 const models = { prospects:'prospect',clients:'client',actions:'action',contracts:'contract',quotes:'quote',invoices:'invoice' } as const;
 const person = { select:{id:true,firstName:true,lastName:true,company:true} };
-const includes = { prospects:{convertedClient:{select:{id:true}}},clients:{_count:{select:{contracts:true}}},actions:{prospect:person},contracts:{client:person},quotes:{client:person,lines:{orderBy:{position:'asc'}}},invoices:{client:person,payments:true} };
+const includes = { prospects:{convertedClient:{select:{id:true}}},clients:{_count:{select:{contracts:true,quotes:true,invoices:true}}},actions:{prospect:person},contracts:{client:person},quotes:{client:person,lines:{orderBy:{position:'asc'}}},invoices:{client:person,payments:true} };
 type Row = Record<string,unknown>;
 type Delegate = { findMany(args: object): Promise<Row[]>; count(args:object):Promise<number> };
 export function csvCell(value: unknown) {
@@ -18,7 +21,7 @@ export function csvCell(value: unknown) {
   return '"'+s.replaceAll('"','""')+'"';
 }
 export function csv(rows: unknown[][]) { return '\uFEFF'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n')+'\r\n'; }
-async function invoiceIds(tx:Prisma.TransactionClient,paymentStatus:unknown, overdue:unknown, zone:string) {
+export async function invoiceIds(tx:Prisma.TransactionClient,paymentStatus:unknown, overdue:unknown, zone:string) {
   const paid=Prisma.sql`COALESCE((SELECT SUM(p."amountCents") FROM "Payment" p WHERE p."invoiceId"=i.id),0)`;
   const conditions: Prisma.Sql[]=[];
   if(paymentStatus==='UNPAID') conditions.push(Prisma.sql`${paid}=0`);
@@ -33,26 +36,51 @@ async function invoiceIds(tx:Prisma.TransactionClient,paymentStatus:unknown, ove
   return result.map(r=>r.id);
 }
 for(const kind of kinds) for(const exporting of [false,true]) discoveryRouter.get(`/${kind}${exporting?'/export':''}`,async(req,res)=>{
-  const parsed=parseList(kind,req.query);
+  const {format: requestedFormat,...query}=req.query;
+  if(requestedFormat!==undefined && (!exporting || !['csv','xlsx'].includes(String(requestedFormat)))) throw new ValidationError('Format invalide.');
+  const parsed=parseList(kind,query);
   const result=await prisma.$transaction(async tx=>{
     if(kind==='invoices' && (parsed.paymentStatus!==undefined || parsed.overdue!==undefined)) parsed.where.id={in:await invoiceIds(tx,parsed.paymentStatus,parsed.overdue,parsed.zone)};
     const delegate=tx[models[kind]] as unknown as Delegate;
     const total=await delegate.count({where:parsed.where});
     if(exporting && total>10000) throw new ValidationError('Export limité à 10 000 lignes : affinez les filtres.');
-    const rows=await delegate.findMany({where:parsed.where,include:includes[kind],orderBy:parsed.orderBy,skip:exporting?0:(parsed.page-1)*parsed.pageSize,take:exporting?10000:parsed.pageSize});
+    const rows=await delegate.findMany({where:parsed.where,include:exporting&&kind==='quotes'?{client:person}:includes[kind],orderBy:parsed.orderBy,skip:exporting?0:(parsed.page-1)*parsed.pageSize,take:exporting?10000:parsed.pageSize});
     const items: Row[]=kind==='invoices'?rows.map(r=>({...r,...settlement(r as unknown as Parameters<typeof settlement>[0],new Intl.DateTimeFormat('en-CA',{timeZone:parsed.zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()))})):rows;
+    if(exporting && items.length && kind==='clients') {
+      const totals=await tx.$queryRaw<{id:number;billed:bigint;paid:bigint;remaining:bigint}[]>(Prisma.sql`SELECT i."clientId" AS id, SUM(i."totalExclTaxCents")::bigint AS billed, SUM(p.paid)::bigint AS paid, SUM(i."totalInclTaxCents"-p.paid)::bigint AS remaining FROM "Invoice" i CROSS JOIN LATERAL (SELECT COALESCE(SUM("amountCents"),0) AS paid FROM "Payment" WHERE "invoiceId"=i.id) p WHERE i.status='ISSUED' AND i."clientId" IN (${Prisma.join(items.map(r=>Number(r.id)))}) GROUP BY i."clientId"`);
+      const byId=new Map(totals.map(r=>[r.id,r]));
+      for(const row of items) {
+        const total=byId.get(Number(row.id)),counts=row._count as Record<string,number>;
+        Object.assign(row,{billedCents:Number(total?.billed??0),paidCents:Number(total?.paid??0),remainingCents:Number(total?.remaining??0),quoteCount:counts.quotes,contractCount:counts.contracts,invoiceCount:counts.invoices});
+      }
+    }
+    if(exporting && items.length && kind==='prospects') {
+      const actions=await tx.$queryRaw<{id:number;lastAction:string;nextFollowUp:Date|null}[]>(Prisma.sql`SELECT p.id, (SELECT a.title FROM "Action" a WHERE a."prospectId"=p.id ORDER BY a."createdAt" DESC,a.id DESC LIMIT 1) AS "lastAction", (SELECT MIN(a."dueAt") FROM "Action" a WHERE a."prospectId"=p.id AND a."completedAt" IS NULL) AS "nextFollowUp" FROM "Prospect" p WHERE p.id IN (${Prisma.join(items.map(r=>Number(r.id)))})`);
+      const byId=new Map(actions.map(r=>[r.id,r]));
+      for(const row of items) Object.assign(row,byId.get(Number(row.id)));
+    }
     return {items,total,page:parsed.page,pageSize:parsed.pageSize,totalPages:Math.ceil(total/parsed.pageSize)};
-  },{isolationLevel:'RepeatableRead'});
+  },{isolationLevel:'RepeatableRead',timeout:exporting?60000:5000});
   if(!exporting) { res.json(result); return; }
+  for(const row of result.items) {
+    if(row.client){const client=row.client as Record<string,unknown>;row.clientName=client.company||`${client.firstName} ${client.lastName}`;}
+    if(kind==='invoices' && row.status!=='ISSUED')row.remainingCents=0;
+  }
   const columns: Record<Kind,[string,string][]>={
-    prospects:[['firstName','Prénom'],['lastName','Nom'],['company','Société'],['email','Email'],['phone','Téléphone'],['status','Statut'],['createdAt','Création']],
-    clients:[['firstName','Prénom'],['lastName','Nom'],['company','Société'],['email','Email'],['phone','Téléphone'],['createdAt','Création']],
+    prospects:[['id','Identifiant'],['firstName','Prénom'],['lastName','Nom'],['company','Société'],['email','Email'],['phone','Téléphone'],['status','Statut'],['createdAt','Création'],['updatedAt','Modification'],['lastAction','Dernière action'],['nextFollowUp','Prochaine relance'],['notes','Notes']],
+    clients:[['id','Identifiant'],['firstName','Prénom'],['lastName','Nom'],['company','Société'],['email','Email'],['phone','Téléphone'],['createdAt','Création'],['quoteCount','Devis'],['contractCount','Contrats'],['invoiceCount','Factures'],['billedCents','Facturé HT (€)'],['paidCents','Réglé TTC (€)'],['remainingCents','Solde TTC (€)']],
     actions:[['title','Titre'],['type','Type'],['prospectId','Prospect'],['dueAt','Échéance'],['completedAt','Terminé le']],
-    contracts:[['reference','Référence'],['title','Titre'],['clientId','Client'],['status','Statut'],['amountCents','Montant HT (€)'],['signedAt','Signature']],
-    quotes:[['reference','Référence'],['title','Titre'],['clientId','Client'],['status','Statut'],['issueDate','Date'],['totalExclTaxCents','Montant HT (€)']],
-    invoices:[['reference','Référence'],['title','Titre'],['clientId','Client'],['status','Statut'],['issueDate','Émission'],['dueDate','Échéance'],['totalExclTaxCents','Montant HT (€)'],['totalInclTaxCents','Montant TTC (€)'],['paymentStatus','Règlement']]
+    contracts:[['reference','Référence'],['title','Titre'],['clientName','Client'],['status','Statut'],['amountCents','Montant HT (€)'],['signedAt','Signature']],
+    quotes:[['reference','Référence'],['title','Titre'],['clientName','Client'],['status','Statut'],['issueDate','Date'],['totalExclTaxCents','Montant HT (€)']],
+    invoices:[['reference','Référence'],['title','Titre'],['clientName','Client'],['status','Statut'],['issueDate','Émission'],['dueDate','Échéance'],['totalExclTaxCents','Montant HT (€)'],['vatCents','TVA (€)'],['totalInclTaxCents','Montant TTC (€)'],['paidCents','Montant réglé (€)'],['remainingCents','Solde TTC (€)'],['paymentStatus','Règlement']]
   };
-  res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition',`attachment; filename="${kind}.csv"`);
+  await audit(res.locals.auth.user.id,'EXPORT',kind,{filters:query,format:requestedFormat??'csv'});
+  const filename=`crm-deis-${({prospects:'prospects',clients:'clients',invoices:'factures'} as Record<string,string>)[kind]??kind}-${new Date().toISOString().slice(0,10)}`;
+  if(requestedFormat==='xlsx') {
+    await sendXlsx(res,`${filename}.xlsx`,columns[kind].map(([key,header])=>({header,format:key.endsWith('Cents')?'money':result.items.some(r=>r[key] instanceof Date)?'date':undefined})),result.items.map(row=>columns[kind].map(([key])=>key.endsWith('Cents')?Number(row[key])/100:row[key])));
+    return;
+  }
+  res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition',`attachment; filename="${filename}.csv"`);
   res.send(csv([columns[kind].map(c=>c[1]),...result.items.map(r=>columns[kind].map(([key])=>key.endsWith('Cents')?(Number(r[key])/100).toFixed(2).replace('.',','):r[key]))]));
 });
 discoveryRouter.get('/search',async(req,res)=>{
@@ -63,7 +91,16 @@ discoveryRouter.get('/search',async(req,res)=>{
     if(!q) {output[kind]=[];return;}
     const fields=['prospects','clients'].includes(kind)?['firstName','lastName','company','email','phone']:['reference','title'];
     const select=['prospects','clients'].includes(kind)?{id:true,firstName:true,lastName:true,company:true}:{id:true,reference:true,title:true};
-    output[kind]=await (prisma[models[kind]] as unknown as Delegate).findMany({where:{OR:fields.map(k=>({[k]:{contains:q,mode:'insensitive'}}))},select,take:8,orderBy:{id:'desc'}});
+    output[kind]=await (prisma[models[kind]] as unknown as Delegate).findMany({where:{...(['prospects','clients'].includes(kind)?{archivedAt:null}:{}),OR:fields.map(k=>({[k]:{contains:q,mode:'insensitive'}}))},select,take:8,orderBy:{id:'desc'}});
   }));
   res.json(output);
+});
+
+for(const kind of ['prospects','clients'] as const) discoveryRouter.post(`/${kind}/:id/archive`,admin,async(req,res)=>{
+  if(typeof req.body?.archived!=='boolean')throw new ValidationError('archived : booléen attendu.');
+  const id=parseId(req.params.id),archivedAt=req.body.archived?new Date():null;
+  const row=await prisma.$transaction(async tx=>{
+    const data=kind==='prospects'?await tx.prospect.update({where:{id},data:{archivedAt}}):await tx.client.update({where:{id},data:{archivedAt}});
+    await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:archivedAt?'ARCHIVE':'RESTORE',target:`${kind}/${id}`}});return data;
+  });res.json(row);
 });

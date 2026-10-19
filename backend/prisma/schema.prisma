@@ -18,6 +18,7 @@ enum ProspectStatus {
 }
 
 model Prospect {
+  archivedAt DateTime?
   convertedClient Client?
   actions   Action[]
   id        Int            @id @default(autoincrement())
@@ -68,6 +69,7 @@ enum ContractStatus {
 }
 
 model Client {
+  archivedAt DateTime?
   quotes Quote[]
   invoices Invoice[]
   id Int @id @default(autoincrement())
@@ -197,4 +199,39 @@ model Payment {
   updatedAt DateTime @updatedAt
   @@index([invoiceId])
   @@index([paidAt])
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+model User {
+  id Int @id @default(autoincrement())
+  email String @unique
+  name String
+  passwordHash String
+  role UserRole @default(USER)
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
+  sessions Session[]
+}
+model Session {
+  tokenHash String @id
+  userId Int
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  csrf String
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+model AuditLog {
+  id Int @id @default(autoincrement())
+  userId Int?
+  action String
+  target String?
+  details Json?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
 }
