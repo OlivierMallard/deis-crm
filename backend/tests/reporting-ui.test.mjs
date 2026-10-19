@@ -14,6 +14,9 @@ test('React renders search, pagination, filters in all sections and reporting na
       import App from './src/App';import Prospects from './src/components/Prospects';import Clients from './src/components/Clients';
       import Contracts from './src/components/Contracts';import Finance from './src/components/Finance';import Actions from './src/components/Actions';import Reporting from './src/components/Reporting';
       import {SearchInput,DateRangeFilter,Pagination} from './src/components/ListTools';
+      import {AuthContext,AdminOnly} from './src/components/Auth';
+      const user={id:1,email:'test@example.invalid',name:'Test',isActive:true};
+      export const roles=['USER','ADMIN'].map(role=>renderToStaticMarkup(<AuthContext.Provider value={{...user,role}}><App/><AdminOnly>ADMIN_SENTINEL</AdminOnly></AuthContext.Provider>));
       export const app=renderToStaticMarkup(<App/>);
       export const sections=[<Prospects onClient={()=>{}}/>,<Clients/>,<Contracts/>,<Finance kind="quotes"/>,<Finance kind="invoices"/>,<Actions/>].map(c=>renderToStaticMarkup(c));
       export const reporting=renderToStaticMarkup(<Reporting/>);
@@ -22,6 +25,8 @@ test('React renders search, pagination, filters in all sections and reporting na
     const path=join(temporary,'ui.cjs');await writeFile(path,result.outputFiles[0].contents);
     const rendered=await import(pathToFileURL(path).href);
     assert.match(rendered.app,/Recherche globale/);assert.match(rendered.app,/Reporting/);
+    assert.doesNotMatch(rendered.roles[0],/Administration|ADMIN_SENTINEL/);
+    assert.match(rendered.roles[1],/Administration/);assert.match(rendered.roles[1],/ADMIN_SENTINEL/);
     for(const section of rendered.sections){assert.match(section,/Réinitialiser les filtres/);assert.match(section,/Exporter CSV/);assert.match(section,/aria-label="Pagination"/)}
     assert.match(rendered.sections[5],/Terminée/);assert.match(rendered.sections[5],/Période/);assert.match(rendered.sections[4],/Règlement/);
     assert.match(rendered.reporting,/12 derniers mois/);assert.match(rendered.reporting,/Période personnalisée/);assert.match(rendered.reporting,/statut actuel/);

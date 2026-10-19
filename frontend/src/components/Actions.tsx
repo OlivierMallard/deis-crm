@@ -1,3 +1,4 @@
+import { AdminOnly } from './Auth'
 import { useListTools, ReferenceSelect } from './ListTools'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { actionsApi, actionTypes, type Action, type ActionInput, type Period } from '../api/actions'
@@ -75,7 +76,7 @@ export default function Actions({ prospect }: { prospect?: Prospect }) {
     </div><div className="form-actions"><button className="button button-primary" type="submit">{busy ? 'Enregistrement…' : 'Enregistrer'}</button><button className="button" type="button" onClick={() => setOpen(false)}>Annuler</button></div></fieldset></form>}
     {loading ? <p role="status">Chargement des actions…</p> : !error && groups.map((g,i) => <section key={g.key} className="action-group"><h3>{g.label} ({lists[i]?.length ?? 0})</h3>
       {!lists[i]?.length ? <p className="empty-list">Aucune action.</p> : lists[i].map(a => <article className="action-item" key={a.id}><div><strong>{a.title}</strong><p>{actionTypes[a.type]} · {a.prospect.firstName} {a.prospect.lastName}</p><p>Prévue : {new Date(a.dueAt).toLocaleString('fr-FR')}{a.completedAt && ` · Terminée : ${new Date(a.completedAt).toLocaleString('fr-FR')}`}</p>{a.description && <p className="action-description">{a.description}</p>}</div>
-        <div className="form-actions"><button className="button" disabled={busy || open} onClick={() => void mutate(() => actionsApi.transition(a), a.completedAt ? 'Action rouverte.' : 'Action terminée.')}>{a.completedAt ? 'Rouvrir' : 'Marquer comme terminée'}</button><button className="button" disabled={busy || open} onClick={() => openForm(a)}>Modifier</button><button className="button button-danger" disabled={busy || open} onClick={() => { if (window.confirm(`Supprimer définitivement l’action « ${a.title} » ?`)) void mutate(() => actionsApi.delete(a.id), 'Action supprimée.') }}>Supprimer</button></div></article>)}
+        <div className="form-actions"><button className="button" disabled={busy || open} onClick={() => void mutate(() => actionsApi.transition(a), a.completedAt ? 'Action rouverte.' : 'Action terminée.')}>{a.completedAt ? 'Rouvrir' : 'Marquer comme terminée'}</button><button className="button" disabled={busy || open} onClick={() => openForm(a)}>Modifier</button><AdminOnly><button className="button button-danger" disabled={busy || open} onClick={() => { if (window.confirm(`Supprimer définitivement l’action « ${a.title} » ?`)) void mutate(() => actionsApi.delete(a.id), 'Action supprimée.') }}>Supprimer</button></AdminOnly></div></article>)}
     </section>)}
     {!loading && !prospects.length && !error && <p className="empty-list">Créez d’abord un prospect dans la rubrique Prospects.</p>}
   </section>

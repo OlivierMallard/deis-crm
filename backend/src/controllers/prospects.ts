@@ -20,7 +20,11 @@ export async function updateProspect(req: Request, res: Response) {
 }
 
 export async function deleteProspect(req: Request, res: Response) {
-  await prisma.prospect.delete({ where: { id: parseProspectId(req.params.id) } });
+  const id=parseProspectId(req.params.id);
+  await prisma.$transaction(async tx=>{
+    await tx.prospect.delete({where:{id}});
+    await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:'DELETE_SUCCESS',target:`prospects/${id}`}});
+  });
   res.status(204).end();
 }
 

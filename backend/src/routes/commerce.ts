@@ -17,7 +17,10 @@ clientsRouter.delete('/:id', async (req, res) => {
   const row = await prisma.client.findUnique({ where: { id }, include: clientInclude });
   if (!row) { res.status(404).json({ message: 'Client introuvable.' }); return; }
   if (row.sourceProspectId || row._count.contracts) { res.status(409).json({ message: 'Suppression refusée : ce client possède un historique ou des contrats.' }); return; }
-  await prisma.client.delete({ where: { id } }); res.status(204).end();
+  await prisma.$transaction(async tx=>{
+    await tx.client.delete({where:{id}});
+    await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:'DELETE_SUCCESS',target:`clients/${id}`}});
+  }); res.status(204).end();
 });
 contractsRouter.get('/:id', async (req, res) => {
   const row = await prisma.contract.findUnique({ where: { id: parseId(req.params.id) }, include: contractInclude });
@@ -35,7 +38,13 @@ async function saveContract(req: import('express').Request, res: import('express
   if (id === undefined) res.status(201).location(`/api/contracts/${row.id}`); res.json(row);
 }
 contractsRouter.post('/', saveContract); contractsRouter.put('/:id', saveContract);
-contractsRouter.delete('/:id', async (req, res) => { await prisma.contract.delete({ where: { id: parseId(req.params.id) } }); res.status(204).end(); });
+contractsRouter.delete('/:id', async (req, res) => {
+  const id=parseId(req.params.id);
+  await prisma.$transaction(async tx=>{
+    await tx.contract.delete({where:{id}});
+    await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:'DELETE_SUCCESS',target:`contracts/${id}`}});
+  });res.status(204).end();
+});
 export async function commercialMetrics(_req: import('express').Request, res: import('express').Response) {
   const [totalClients, activeContracts, signed, proposed] = await prisma.$transaction([
     prisma.client.count(), prisma.contract.count({ where: { status: { in: ['SIGNED','IN_PROGRESS'] } } }),

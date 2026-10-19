@@ -1,6 +1,6 @@
 import type { Prospect } from './prospects'
 export type ClientInput = { firstName: string; lastName: string; company: string | null; email: string | null; phone: string | null; notes: string | null }
-export type Client = ClientInput & { id: number; sourceProspectId: number | null; sourceProspect?: Prospect | null; contracts?: Contract[]; _count: { contracts: number } }
+export type Client = ClientInput & { archivedAt?:string|null; id: number; sourceProspectId: number | null; sourceProspect?: Prospect | null; contracts?: Contract[]; _count: { contracts: number } }
 export const contractLabels = { DRAFT: 'Brouillon', PROPOSED: 'Proposé', SIGNED: 'Signé', IN_PROGRESS: 'En cours', COMPLETED: 'Terminé', CANCELLED: 'Annulé' } as const
 export type ContractInput = { clientId: number; reference: string | null; title: string; description: string | null; amountCents: number; status: keyof typeof contractLabels; startDate: string | null; endDate: string | null }
 export type Contract = ContractInput & { id: number; client?: Client; signedAt: string | null }

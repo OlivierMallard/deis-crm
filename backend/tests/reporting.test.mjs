@@ -1,3 +1,4 @@
+import './legacy-auth.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -101,6 +102,7 @@ test('persistent monthly goal, atomic updates, validation, actual invoiced progr
   const {spawn}=await import('node:child_process');
   const directory=await mkdtemp(join(tmpdir(),'crm-m9-goal-'));
   const child=spawn(process.execPath,['--input-type=module','-e',`
+    await import('./tests/legacy-auth.mjs');
     const {app}=await import('./dist/app.js');const {prisma}=await import('./dist/lib/prisma.js');
     prisma.invoice.aggregate=async()=>({_sum:{totalExclTaxCents:125000}});
     const server=app.listen(0,'127.0.0.1',()=>console.log(server.address().port));

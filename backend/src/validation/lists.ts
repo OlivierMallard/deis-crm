@@ -28,7 +28,7 @@ export function localBounds(date: string, zone: string) {
 }
 export function parseList(kind: Kind, query: Record<string,unknown>) {
   const specific: Record<Kind,string[]> = { prospects:['status','createdFrom','createdTo'], clients:['createdFrom','createdTo'], actions:['type','prospectId','completed','period'], contracts:['clientId','status','startFrom','startTo','endFrom','endTo','amountMin','amountMax'], quotes:['clientId','contractId','status','dateFrom','dateTo','amountMin','amountMax'], invoices:['clientId','contractId','status','paymentStatus','overdue','dateFrom','dateTo','dueFrom','dueTo','amountMin','amountMax'] };
-  const allowed = ['q','search','page','pageSize','sort','direction','timeZone',...specific[kind]];
+  const allowed = ['q','search','page','pageSize','sort','direction','timeZone',...(['prospects','clients'].includes(kind)?['archived']:[]),...specific[kind]];
   for (const key of Object.keys(query)) if (!allowed.includes(key)) throw new ValidationError(`Filtre inconnu : ${key}.`);
   for (const [key,value] of Object.entries(query)) if(typeof value!=='string') throw new ValidationError(`${key} doit être une valeur simple.`);
   const zone = query.timeZone === undefined ? kind==='invoices'?'Europe/Paris':'UTC' : textQuery(query.timeZone,'timeZone');
@@ -37,6 +37,10 @@ export function parseList(kind: Kind, query: Record<string,unknown>) {
   const pageSize = query.pageSize === undefined ? 25 : integer(query.pageSize,'pageSize',1,100);
   const q = query.q === undefined ? query.search === undefined ? '' : textQuery(query.search,'search') : textQuery(query.q,'q');
   const where: Record<string,unknown> = {};
+  if(['prospects','clients'].includes(kind)) {
+    if(query.archived!==undefined&&!['true','false','all'].includes(String(query.archived)))throw new ValidationError('Filtre archive invalide.');
+    if(query.archived!=='all')where.archivedAt=query.archived==='true'?{not:null}:null;
+  }
   if (q) where.OR = (kind==='actions' ? ['title','description'] : ['prospects','clients'].includes(kind) ? ['firstName','lastName','company','email','phone'] : ['reference','title']).map(k=>({[k]:{contains:q,mode:'insensitive'}}));
   for(const key of ['clientId','contractId','prospectId']) if(query[key]!==undefined) where[key]=parseId(query[key]);
   if(query.status!==undefined) { const value=textQuery(query.status,'status'); if(!statuses[kind]?.includes(value)) throw new ValidationError('Statut invalide.'); where.status=value; }

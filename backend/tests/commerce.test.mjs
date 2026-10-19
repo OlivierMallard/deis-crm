@@ -1,3 +1,4 @@
+import './legacy-auth.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { once } from 'node:events';
@@ -110,7 +111,7 @@ test('HTTP conversion, CRUD and metrics with Prisma doubles', async () => {
     patch(delegate,'create',async ({data}) => {
       if(name === 'client' && data.sourceProspectId && [...table.values()].some(c => c.sourceProspectId === data.sourceProspectId)) fail('P2002');
       if(name === 'contract' && [...table.values()].some(c => c.reference === data.reference)) fail('P2002');
-      const row = { sourceProspectId: null, status: 'NEW', ...data, id: sequence++ }; table.set(row.id,row); return decorate(name,row);
+      const row = { archivedAt:null, sourceProspectId: null, status: 'NEW', ...data, id: sequence++ }; table.set(row.id,row); return decorate(name,row);
     });
     patch(delegate,'update',async ({where,data}) => { const row = table.get(where.id); if(!row) fail('P2025'); Object.assign(row,data); return decorate(name,row); });
     patch(delegate,'delete',async ({where}) => { if(!table.has(where.id)) fail('P2025'); if(name === 'prospect' && [...tables.client.values()].some(c => c.sourceProspectId === where.id)) fail('P2003'); if(name === 'client' && [...tables.contract.values()].some(c => c.clientId === where.id)) fail('P2003'); table.delete(where.id); });

@@ -16,7 +16,11 @@ export async function saveAction(req: Request, res: Response) {
   res.json(action);
 }
 export async function deleteAction(req: Request, res: Response) {
-  await prisma.action.delete({ where: { id: parseActionId(req.params.id) } });
+  const id=parseActionId(req.params.id);
+  await prisma.$transaction(async tx=>{
+    await tx.action.delete({where:{id}});
+    await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:'DELETE_SUCCESS',target:`actions/${id}`}});
+  });
   res.status(204).end();
 }
 export async function completeAction(req: Request, res: Response) {

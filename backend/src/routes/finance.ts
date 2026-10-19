@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -42,7 +42,7 @@ for (const method of ['post','put'] as const) quotesRouter[method](method === 'p
 });
 quotesRouter.delete('/:id', async (req,res) => {
   const id = parseId(req.params.id);
-  await prisma.$transaction(async tx => { await lock(tx,'Quote',id); const row = await tx.quote.findUniqueOrThrow({ where: { id } }); if (row.status === 'ACCEPTED') throw new FinanceError(409,'Devis acceptÃ© verrouillÃ©.'); await tx.quote.delete({ where: { id } }); });
+  await prisma.$transaction(async tx => { await lock(tx,'Quote',id); const row = await tx.quote.findUniqueOrThrow({ where: { id } }); if (row.status !== 'DRAFT') throw new FinanceError(409,'Devis acceptÃ© verrouillÃ©.'); await tx.quote.delete({ where: { id } }); await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:'DELETE_SUCCESS',target:`quotes/${id}`}}); });
   res.status(204).end();
 });
 invoicesRouter.get('/:id', async (req,res) => {
@@ -69,7 +69,7 @@ for (const method of ['post','put'] as const) invoicesRouter[method](method === 
 });
 invoicesRouter.delete('/:id', async (req,res) => {
   const id = parseId(req.params.id);
-  await prisma.$transaction(async tx => { await lock(tx,'Invoice',id); const row = await tx.invoice.findUniqueOrThrow({ where: { id }, include: { payments: true } }); if (row.status !== 'DRAFT' || row.payments.length) throw new FinanceError(409,'Seule une facture brouillon sans paiement peut Ãªtre supprimÃ©e.'); await tx.invoice.delete({ where: { id } }); }); res.status(204).end();
+  await prisma.$transaction(async tx => { await lock(tx,'Invoice',id); const row = await tx.invoice.findUniqueOrThrow({ where: { id }, include: { payments: true } }); if (row.status !== 'DRAFT' || row.payments.length) throw new FinanceError(409,'Seule une facture brouillon sans paiement peut Ãªtre supprimÃ©e.'); await tx.invoice.delete({ where: { id } }); await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:'DELETE_SUCCESS',target:`invoices/${id}`}}); }); res.status(204).end();
 });
 paymentsRouter.get('/', async (req,res) => {
   const v = object(req.query,['invoiceId','clientId','page','pageSize']);
@@ -92,7 +92,7 @@ for (const method of ['post','put'] as const) paymentsRouter[method](method === 
 });
 paymentsRouter.delete('/:id', async (req,res) => {
   const id = parseId(req.params.id);
-  await prisma.$transaction(async tx => { const p = await tx.payment.findUnique({ where: { id } }); if (!p) throw new FinanceError(404,'Paiement introuvable.'); await lock(tx,'Invoice',p.invoiceId); await tx.payment.delete({ where: { id } }); }); res.status(204).end();
+  await prisma.$transaction(async tx => { const p = await tx.payment.findUnique({ where: { id } }); if (!p) throw new FinanceError(404,'Paiement introuvable.'); await lock(tx,'Invoice',p.invoiceId); await tx.payment.delete({ where: { id } }); await tx.auditLog.create({data:{userId:res.locals.auth.user.id,action:'DELETE_SUCCESS',target:`payments/${id}`}}); }); res.status(204).end();
 });
 export async function financeMetrics(_req: import('express').Request, res: import('express').Response) {
   const result = await prisma.$transaction(async tx => {
